@@ -20,9 +20,9 @@ type (
 func LoadConfig() (*config, error) {
 	config := &config{}
 
-	//FIXME path of config file
-	//currently assumes ~/.nitro_config
-	configData, err := ioutil.ReadFile(filepath.Join(os.Getenv("HOME"), ".nitro_config"))
+	// FIXME path of config file
+	// currently assumes ~/.nitro_config
+	configData, err := ioutil.ReadFile(filepath.Join(os.Getenv("HOME"), ".nitroconfig"))
 	if err != nil {
 		return config, err
 	}
@@ -33,4 +33,9 @@ func LoadConfig() (*config, error) {
 	}
 
 	return config, err
+}
+
+func TokenFilePath() string {
+	// FIXME correct path for the token file
+	return filepath.Join(os.Getenv("HOME"), ".nitrotoken")
 }

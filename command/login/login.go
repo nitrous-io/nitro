@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -139,7 +138,7 @@ func (c *LoginCommand) Run(args []string) int {
 	case 401:
 		c.UI.Error(fmt.Sprintf("Failed to login: %v", m.ErrorDescription))
 	case 200:
-		err = ioutil.WriteFile(filepath.Join(os.Getenv("HOME"), ".nitro_token"), []byte(m.AccessToken), 0644)
+		err = ioutil.WriteFile(utils.TokenFilePath(), []byte(m.AccessToken), 0644)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Error occurred when saving access token: %v", err))
 		} else {

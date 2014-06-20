@@ -61,6 +61,12 @@ func NewLoginCommand() (cli.Command, error) {
 	}, nil
 }
 
+type LoginMessage struct {
+	Error            string `json:"error"`
+	ErrorDescription string `json:"error_description"`
+	AccessToken      string `json:"access_token"`
+}
+
 func (c *LoginCommand) Help() string {
 	return strings.TrimSpace(fmt.Sprintf(usage, usernameUsage, passwordUsage))
 }
@@ -83,7 +89,7 @@ func (c *LoginCommand) Run(args []string) int {
 		username, err = c.UI.Ask("Username:")
 		if err != nil {
 			if err.Error() == "interrupted" {
-				return 0
+				return 2
 			}
 			c.UI.Error(fmt.Sprintf("An unexpected error has occurred: %v", err))
 		}
@@ -96,18 +102,12 @@ func (c *LoginCommand) Run(args []string) int {
 	username = strings.TrimSpace(username)
 	password = strings.TrimSpace(password)
 
-	config, err := utils.LoadConfig()
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Failed to load config. Place your config file in the given path.\n: %v", err))
-		return 1
-	}
-
 	p := url.Values{}
 	p.Set("grant_type", "password")
 	p.Set("username", username)
 	p.Set("password", password)
-	p.Set("client_id", config.ClientID)         // fetch from config
-	p.Set("client_secret", config.ClientSecret) // fetch from config
+	p.Set("client_id", c.ClientID)
+	p.Set("client_secret", c.ClientSecret)
 
 	no_ssl_verify, _ := strconv.ParseBool(os.Getenv("NO_SSL_VERIFY"))
 	tr := &http.Transport{
@@ -115,19 +115,15 @@ func (c *LoginCommand) Run(args []string) int {
 	}
 
 	client := &http.Client{Transport: tr}
-	url := fmt.Sprintf("%s/oauth/token", config.Server)
+	url := fmt.Sprintf("%s/oauth/token", c.Server)
 	response, err := client.PostForm(url, p)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Failed to authenticate: %v", err))
+		return 1
 	}
 	defer response.Body.Close()
 
-	type message struct {
-		Error            string `json:"error"`
-		ErrorDescription string `json:"error_description"`
-		AccessToken      string `json:"access_token"`
-	}
-	var m message
+	var m LoginMessage
 
 	err = json.NewDecoder(response.Body).Decode(&m)
 	if err != nil {
@@ -138,7 +134,7 @@ func (c *LoginCommand) Run(args []string) int {
 	case 401:
 		c.UI.Error(fmt.Sprintf("Failed to login: %v", m.ErrorDescription))
 	case 200:
-		err = ioutil.WriteFile(utils.TokenFilePath(), []byte(m.AccessToken), 0644)
+		err = ioutil.WriteFile(c.TokenFilePath, []byte(m.AccessToken), 0644)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Error occurred when saving access token: %v", err))
 		} else {

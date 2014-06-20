@@ -1,4 +1,4 @@
-package command
+package logout
 
 import (
 	"fmt"
@@ -7,22 +7,35 @@ import (
 	"strings"
 
 	"github.com/mitchellh/cli"
+	"github.com/nitrous-io/nitro/command"
 	"github.com/nitrous-io/nitro/command/utils"
 	flag "github.com/ogier/pflag"
 )
 
-const logoutUsage = `
+const usage = `
 Usage: nitro logout
 
   logout from authenticated Nitrous.IO account.
 `
 
 type LogoutCommand struct {
-	UI cli.Ui
+	UI            cli.Ui
+	TokenFilePath string
+}
+
+func init() {
+	command.Register("logout", NewLogoutCommand)
+}
+
+func NewLogoutCommand() (cli.Command, error) {
+	return &LogoutCommand{
+		UI:            command.DefaultUI,
+		TokenFilePath: utils.TokenFilePath(),
+	}, nil
 }
 
 func (c *LogoutCommand) Help() string {
-	return strings.TrimSpace(fmt.Sprintf(logoutUsage))
+	return strings.TrimSpace(fmt.Sprintf(usage))
 }
 
 func (c *LogoutCommand) Run(args []string) int {
@@ -34,9 +47,9 @@ func (c *LogoutCommand) Run(args []string) int {
 		return 1
 	}
 
-	err = os.Remove(utils.TokenFilePath())
+	err = os.Remove(c.TokenFilePath)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Failed to logout from Nitrous.IO"))
+		c.UI.Error(fmt.Sprintf("Failed to logout from Nitrous.IO."))
 		return 1
 	}
 

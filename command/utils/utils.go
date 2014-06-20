@@ -21,7 +21,7 @@ func LoadConfig() (*config, error) {
 	config := &config{}
 
 	// FIXME path of config file
-	// currently assumes ~/.nitro_config
+	// currently assumes ~/.nitroconfig
 	configData, err := ioutil.ReadFile(filepath.Join(os.Getenv("HOME"), ".nitroconfig"))
 	if err != nil {
 		return config, err

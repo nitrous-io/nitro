@@ -20,10 +20,6 @@ var _ = Describe("environment", func() {
 			env = BaseEnvironment()
 		})
 
-		It("verifies SSL", func() {
-			Expect(env.SSLVerify).To(Equal(true))
-		})
-
 		It("uses ~/.nitro base dir", func() {
 			Expect(env.BaseDir).To(Equal(path.Join(os.Getenv("HOME"), ".nitro")))
 		})

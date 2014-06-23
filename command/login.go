@@ -6,6 +6,7 @@ import (
 
 	"github.com/howeyc/gopass"
 	"github.com/mitchellh/cli"
+	"github.com/nitrous-io/nitro/environment"
 	flag "github.com/ogier/pflag"
 )
 
@@ -26,7 +27,8 @@ Options:
 `
 
 type LoginCommand struct {
-	UI cli.Ui
+	UI  cli.Ui
+	Env environment.Environment
 }
 
 func (c *LoginCommand) Help() string {

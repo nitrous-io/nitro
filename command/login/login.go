@@ -1,15 +1,12 @@
 package login
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"os"
-	"strconv"
 	"strings"
 
 	"github.com/howeyc/gopass"
@@ -109,14 +106,8 @@ func (c *LoginCommand) Run(args []string) int {
 	p.Set("client_id", c.ClientID)
 	p.Set("client_secret", c.ClientSecret)
 
-	v, _ := strconv.ParseBool(os.Getenv("NO_SSL_VERIFY"))
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: v},
-	}
-
-	client := &http.Client{Transport: tr}
 	url := fmt.Sprintf("%s/oauth/token", c.Server)
-	response, err := client.PostForm(url, p)
+	response, err := http.PostForm(url, p)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Failed to authenticate: %v", err))
 		return 1

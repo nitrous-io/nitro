@@ -24,6 +24,7 @@ import (
 	_ "github.com/nitrous-io/nitro/command/login"
 	_ "github.com/nitrous-io/nitro/command/logout"
 	_ "github.com/nitrous-io/nitro/command/logs"
+	_ "github.com/nitrous-io/nitro/command/shell"
 )
 
 var version string

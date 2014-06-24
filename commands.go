@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/mitchellh/cli"
@@ -12,7 +13,12 @@ import (
 var Commands = map[string]cli.CommandFactory{}
 
 func init() {
-	env := environment.BaseEnvironment()
+	env, err := environment.BaseEnvironmentWithConfig()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error loading config: ", err.Error())
+		os.Exit(1)
+	}
+
 	defaultUI := &command.BasicUI{cli.BasicUi{
 		Reader: os.Stdin,
 		Writer: os.Stdout,

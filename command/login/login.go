@@ -109,9 +109,9 @@ func (c *LoginCommand) Run(args []string) int {
 	p.Set("client_id", c.ClientID)
 	p.Set("client_secret", c.ClientSecret)
 
-	no_ssl_verify, _ := strconv.ParseBool(os.Getenv("NO_SSL_VERIFY"))
+	v, _ := strconv.ParseBool(os.Getenv("NO_SSL_VERIFY"))
 	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: no_ssl_verify},
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: v},
 	}
 
 	client := &http.Client{Transport: tr}
@@ -128,6 +128,7 @@ func (c *LoginCommand) Run(args []string) int {
 	err = json.NewDecoder(response.Body).Decode(&m)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("An unexpected error has occurred: %v", err))
+		return 1
 	}
 
 	switch response.StatusCode {

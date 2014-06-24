@@ -2,7 +2,6 @@ package utils
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -29,7 +28,7 @@ func LoadConfig() (*config, error) {
 
 	err = json.Unmarshal(configData, config)
 	if err != nil {
-		err = errors.New(fmt.Sprintf("invalid config data %v", string(configData)))
+		err = fmt.Errorf("invalid config data %v", string(configData))
 	}
 
 	return config, err

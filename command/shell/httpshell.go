@@ -39,7 +39,7 @@ func NewHttpShell(host, containerId string) *HttpShell {
 // request a new shell id. This will create a remote shell on the specified
 // container
 func (s *HttpShell) RequestShell() error {
-	endpoint := fmt.Sprintf("/containers/%s/shells?%s", s.containerId, nil)
+	endpoint := fmt.Sprintf("/containers/%s/shells", s.containerId)
 	req, err := http.NewRequest("POST", endpoint, nil)
 	if err != nil {
 		return err

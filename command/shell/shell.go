@@ -70,7 +70,7 @@ func (c *ShellCommand) Run(args []string) int {
 		return 1
 	}
 	if err := s.Attach(pty.Fd(), stdin, stdout); err != nil {
-		c.UI.Error("Shell detached")
+		c.UI.Error(fmt.Sprintf("Shell detached %v", err))
 		return 1
 	}
 	return 0

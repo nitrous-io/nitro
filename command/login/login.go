@@ -32,7 +32,7 @@ Options:
 type LoginCommand struct {
 	UI            cli.Ui
 	TokenFilePath string
-	Config        *config.Config
+	Server        string
 }
 
 func init() {
@@ -40,14 +40,10 @@ func init() {
 }
 
 func NewLoginCommand() (cli.Command, error) {
-	c, err := config.LoadConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load config file")
-	}
 	return &LoginCommand{
 		UI:            command.DefaultUI,
 		TokenFilePath: config.TokenFilePath(),
-		Config:        c,
+		Server:        config.APIServer(),
 	}, nil
 }
 
@@ -86,7 +82,7 @@ func (c *LoginCommand) Run(args []string) int {
 	username = strings.TrimSpace(username)
 	password = strings.TrimSpace(password)
 
-	accessToken, err := user.GetAccessToken(username, password, c.Config)
+	accessToken, err := user.GetAccessToken(username, password, c.Server)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Failed to login: %v", err))
 		return 1

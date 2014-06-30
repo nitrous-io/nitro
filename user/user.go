@@ -5,19 +5,15 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-
-	"github.com/nitrous-io/nitro/command/config"
 )
 
-func GetAccessToken(username, password string, config *config.Config) (string, error) {
+func GetAccessToken(username, password, server string) (string, error) {
 	p := url.Values{}
 	p.Set("grant_type", "password")
 	p.Set("username", username)
 	p.Set("password", password)
-	p.Set("client_id", config.ClientID)
-	p.Set("client_secret", config.ClientSecret)
 
-	url := fmt.Sprintf("%s/oauth/token", config.Server)
+	url := fmt.Sprintf("%s/oauth/token", server)
 	response, err := http.PostForm(url, p)
 	if err != nil {
 		return "", err

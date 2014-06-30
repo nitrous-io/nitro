@@ -8,7 +8,6 @@ import (
 	"os"
 
 	"github.com/mitchellh/cli"
-	"github.com/nitrous-io/nitro/command/config"
 	. "github.com/nitrous-io/nitro/command/login"
 
 	. "github.com/onsi/ginkgo"
@@ -61,15 +60,10 @@ var _ = Describe("LoginCommand", func() {
 		testServer = authTestServer(username, password)
 
 		ui = &cli.MockUi{}
-		c := &config.Config{
-			ClientID:     "client_id",
-			ClientSecret: "client_secret",
-			Server:       testServer.URL,
-		}
 		cmd = &LoginCommand{
 			UI:            ui,
 			TokenFilePath: "/tmp/.nitrotoken",
-			Config:        c,
+			Server:        testServer.URL,
 		}
 	})
 

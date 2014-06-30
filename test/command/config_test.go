@@ -1,7 +1,6 @@
 package commandtest
 
 import (
-	"io/ioutil"
 	"os"
 
 	"github.com/nitrous-io/nitro/command/config"
@@ -21,35 +20,24 @@ var _ = Describe("Utils", func() {
 		os.Setenv("HOME", currentHome)
 	})
 
-	Describe("LoadConfig", func() {
-		Context("When config file exists", func() {
-			BeforeEach(func() {
-				sample_config := `
-{
-	"server": "https://www.example.com",
-  "client_id": "client_id",
-  "client_secret": "client_secret"
-}
-			`
-				// assuming $HOME is set to /tmp
-				ioutil.WriteFile("/tmp/.nitroconfig", []byte(sample_config), 0644)
-			})
-
-			AfterEach(func() {
-				os.Remove("/tmp/.nitroconfig")
-			})
-
-			It("returns the read config", func() {
-				config, err := config.LoadConfig()
-				Expect(err).NotTo(HaveOccurred())
-				Expect(config.Server).To(Equal("https://www.example.com"))
+	Describe("APIServer", func() {
+		Context("when NITRO_API_URL env variable is empty", func() {
+			It("returns the default server host", func() {
+				Expect(config.APIServer()).To(Equal("http://0.0.0.0:3000"))
 			})
 		})
 
-		Context("When config file does not exist", func() {
-			It("Returns an Error", func() {
-				_, err := config.LoadConfig()
-				Expect(err).Should(HaveOccurred())
+		Context("when NITRO_API_URL env variable is set", func() {
+			BeforeEach(func() {
+				os.Setenv("NITRO_API_URL", "https://www.example.com")
+			})
+
+			AfterEach(func() {
+				os.Setenv("NITRO_API_URL", "")
+			})
+
+			It("returns server set in the env variable", func() {
+				Expect(config.APIServer()).To(Equal("https://www.example.com"))
 			})
 		})
 	})

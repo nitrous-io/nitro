@@ -49,7 +49,7 @@ func (c *ShellCommand) Run(args []string) int {
 	host := args[0]
 	container := args[1]
 
-	s := NewHttpShell(host, container)
+	s := NewHTTPShell(host, container)
 
 	if err := s.RequestShell(); err != nil {
 		c.UI.Error(fmt.Sprintf("RequestShell: %v", err))

@@ -26,19 +26,19 @@ type shell struct {
 	Id string `json:"id"`
 }
 
-type HttpShell struct {
+type HTTPShell struct {
 	Id          string `json:"id"`
 	host        string
 	containerId string
 }
 
-func NewHttpShell(host, containerId string) *HttpShell {
-	return &HttpShell{host: host, containerId: containerId}
+func NewHTTPShell(host, containerId string) *HTTPShell {
+	return &HTTPShell{host: host, containerId: containerId}
 }
 
 // request a new shell id. This will create a remote shell on the specified
 // container
-func (s *HttpShell) RequestShell() error {
+func (s *HTTPShell) RequestShell() error {
 	endpoint := fmt.Sprintf("/containers/%s/shells", s.containerId)
 	req, err := http.NewRequest("POST", endpoint, nil)
 	if err != nil {
@@ -60,7 +60,7 @@ func (s *HttpShell) RequestShell() error {
 }
 
 // connect stdin and stdout respectively to their remote parts
-func (s *HttpShell) Attach(fd uintptr, stdin io.Reader, stdout io.Writer) error {
+func (s *HTTPShell) Attach(fd uintptr, stdin io.Reader, stdout io.Writer) error {
 	// restore the terminal back to old state when we finish
 	var oldState *term.State
 	oldState, err := term.SetRawTerminal(fd)
@@ -105,7 +105,7 @@ func (s *HttpShell) Attach(fd uintptr, stdin io.Reader, stdout io.Writer) error 
 	return <-done
 }
 
-func (s *HttpShell) monitorSize(fd uintptr) error {
+func (s *HTTPShell) monitorSize(fd uintptr) error {
 	if err := s.resize(fd); err != nil {
 		return err
 	}
@@ -121,7 +121,7 @@ func (s *HttpShell) monitorSize(fd uintptr) error {
 
 // given the current terminal file descriptor, resize the remote terminal to
 // match the local terminal size
-func (s *HttpShell) resize(fd uintptr) error {
+func (s *HTTPShell) resize(fd uintptr) error {
 	w, h := getSize(fd)
 	values := make(url.Values)
 	values.Set("width", strconv.Itoa(w))
@@ -149,7 +149,7 @@ func (s *HttpShell) resize(fd uintptr) error {
 
 // get a client connection to the remote server. The connection need to
 // implements Hijacker
-func (s *HttpShell) getConn() (*httputil.ClientConn, error) {
+func (s *HTTPShell) getConn() (*httputil.ClientConn, error) {
 	dial, err := net.Dial("tcp", s.host)
 	if err != nil {
 		return nil, fmt.Errorf("Can't connect to %v", s.host)

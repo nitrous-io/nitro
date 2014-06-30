@@ -8,16 +8,14 @@ import (
 	"path/filepath"
 )
 
-type (
-	config struct {
-		Server       string `json:"server"`
-		ClientID     string `json:"client_id"`
-		ClientSecret string `json:"client_secret"`
-	}
-)
+type Config struct {
+	Server       string `json:"server"`
+	ClientID     string `json:"client_id"`
+	ClientSecret string `json:"client_secret"`
+}
 
-func LoadConfig() (*config, error) {
-	config := &config{}
+func LoadConfig() (*Config, error) {
+	config := &Config{}
 
 	// FIXME path of config file
 	// currently assumes ~/.nitroconfig

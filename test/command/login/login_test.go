@@ -9,6 +9,7 @@ import (
 
 	"github.com/mitchellh/cli"
 	. "github.com/nitrous-io/nitro/command/login"
+	"github.com/nitrous-io/nitro/command/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -21,11 +22,16 @@ func authTestServer(username, password string) *httptest.Server {
 		u := r.Form.Get("username")
 		p := r.Form.Get("password")
 
-		var m LoginMessage
+		type message struct {
+			Error            string `json:"error"`
+			ErrorDescription string `json:"error_description"`
+			AccessToken      string `json:"access_token"`
+		}
+		var m message
 		if username == u && password == p {
-			m = LoginMessage{AccessToken: "abcd1234"}
+			m = message{AccessToken: "abcd1234"}
 		} else {
-			m = LoginMessage{Error: "invalid_login", ErrorDescription: "Cannot login with the provided credentials"}
+			m = message{Error: "invalid_login", ErrorDescription: "Cannot login with the provided credentials"}
 			w.WriteHeader(401)
 		}
 		payload, err := json.Marshal(m)
@@ -39,8 +45,9 @@ func authTestServer(username, password string) *httptest.Server {
 
 var _ = Describe("LoginCommand", func() {
 	var (
-		cmd *LoginCommand
-		ui  *cli.MockUi
+		cmd    *LoginCommand
+		ui     *cli.MockUi
+		config *utils.Config
 
 		username   string
 		password   string
@@ -55,11 +62,15 @@ var _ = Describe("LoginCommand", func() {
 		testServer = authTestServer(username, password)
 
 		ui = &cli.MockUi{}
-		cmd = &LoginCommand{UI: ui,
+		config = &utils.Config{
+			ClientID:     "client_id",
+			ClientSecret: "client_secret",
+			Server:       testServer.URL,
+		}
+		cmd = &LoginCommand{
+			UI:            ui,
 			TokenFilePath: "/tmp/.nitrotoken",
-			ClientID:      "client_id",
-			ClientSecret:  "client_secret",
-			Server:        testServer.URL,
+			Config:        config,
 		}
 	})
 
@@ -108,7 +119,7 @@ var _ = Describe("LoginCommand", func() {
 			}
 
 			exitCode := cmd.Run(args)
-			Expect(exitCode).To(Equal(0))
+			Expect(exitCode).To(Equal(1))
 		})
 
 		It("doesnt write the access token to .nitrotoken file", func() {

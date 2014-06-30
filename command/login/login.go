@@ -1,18 +1,15 @@
 package login
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
-	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/howeyc/gopass"
 	"github.com/mitchellh/cli"
 	"github.com/nitrous-io/nitro/command"
 	"github.com/nitrous-io/nitro/command/utils"
+	"github.com/nitrous-io/nitro/user"
 	flag "github.com/ogier/pflag"
 )
 
@@ -35,9 +32,7 @@ Options:
 type LoginCommand struct {
 	UI            cli.Ui
 	TokenFilePath string
-	ClientID      string
-	ClientSecret  string
-	Server        string
+	Config        *utils.Config
 }
 
 func init() {
@@ -47,21 +42,13 @@ func init() {
 func NewLoginCommand() (cli.Command, error) {
 	config, err := utils.LoadConfig()
 	if err != nil {
-		return nil, errors.New("failed to load config")
+		return nil, fmt.Errorf("failed to load config file")
 	}
 	return &LoginCommand{
 		UI:            command.DefaultUI,
 		TokenFilePath: utils.TokenFilePath(),
-		ClientID:      config.ClientID,
-		ClientSecret:  config.ClientSecret,
-		Server:        config.Server,
+		Config:        config,
 	}, nil
-}
-
-type LoginMessage struct {
-	Error            string `json:"error"`
-	ErrorDescription string `json:"error_description"`
-	AccessToken      string `json:"access_token"`
 }
 
 func (c *LoginCommand) Help() string {
@@ -99,43 +86,19 @@ func (c *LoginCommand) Run(args []string) int {
 	username = strings.TrimSpace(username)
 	password = strings.TrimSpace(password)
 
-	p := url.Values{}
-	p.Set("grant_type", "password")
-	p.Set("username", username)
-	p.Set("password", password)
-	p.Set("client_id", c.ClientID)
-	p.Set("client_secret", c.ClientSecret)
-
-	url := fmt.Sprintf("%s/oauth/token", c.Server)
-	response, err := http.PostForm(url, p)
+	accessToken, err := user.GetAccessToken(username, password, c.Config)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Failed to authenticate: %v", err))
-		return 1
-	}
-	defer response.Body.Close()
-
-	var m LoginMessage
-
-	err = json.NewDecoder(response.Body).Decode(&m)
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("An unexpected error has occurred: %v", err))
+		c.UI.Error(fmt.Sprintf("Failed to login: %v", err))
 		return 1
 	}
 
-	switch response.StatusCode {
-	case 401:
-		c.UI.Error(fmt.Sprintf("Failed to login: %v", m.ErrorDescription))
-	case 200:
-		err = ioutil.WriteFile(c.TokenFilePath, []byte(m.AccessToken), 0644)
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error occurred when saving access token: %v", err))
-		} else {
-			c.UI.Info(fmt.Sprintf("Logged in as '%v'", username))
-		}
-	default:
-		c.UI.Error(fmt.Sprintf("Failed to authenticate. Authentication responded with : %v", response.Status))
+	err = ioutil.WriteFile(c.TokenFilePath, []byte(accessToken), 0644)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("Error occurred when saving the access token: %v", err))
+		return 1
 	}
 
+	c.UI.Info(fmt.Sprintf("Logged in as '%v'", username))
 	return 0
 }
 

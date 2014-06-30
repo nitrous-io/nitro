@@ -52,8 +52,16 @@ func (s *HTTPShell) RequestShell() error {
 	}
 	defer c.Close()
 	resp, err := c.Do(req)
-	if err != nil || resp.StatusCode != 200 {
-		return fmt.Errorf("Failed to request a remote shell %v", resp)
+	if err != nil {
+		return fmt.Errorf("Failed to get a remote shell for container %s, error %v",
+			s.containerId, err)
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("Missing container %s", s.containerId)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Failed to get a remote shell for container %s, status %d",
+			s.containerId, resp.StatusCode)
 	}
 
 	return json.NewDecoder(resp.Body).Decode(s)
@@ -84,7 +92,8 @@ func (s *HTTPShell) Attach(fd uintptr, stdin io.Reader, stdout io.Writer) error 
 	// we ignore error because the connection will be hijacked
 	resp, _ := c.Do(req)
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Failed to attach to the remote shell %v", resp)
+		return fmt.Errorf("Failed to attach to the remote shell for container %s, status %d",
+			s.containerId, resp.StatusCode)
 	}
 
 	// hijack the http . We have the stream writer and reader now
@@ -141,8 +150,11 @@ func (s *HTTPShell) resize(fd uintptr) error {
 	}
 	defer c.Close()
 	resp, err := c.Do(req)
-	if err != nil || resp.StatusCode != http.StatusAccepted {
-		return fmt.Errorf("Failed to resize %v %v", s.Id, resp)
+	if err != nil {
+		return fmt.Errorf("Failed to resize session %s, err: %v", s.Id, err)
+	}
+	if resp.StatusCode != http.StatusAccepted {
+		return fmt.Errorf("Failed to resize session %s, status %d", s.Id, resp.StatusCode)
 	}
 	return nil
 }
@@ -152,7 +164,7 @@ func (s *HTTPShell) resize(fd uintptr) error {
 func (s *HTTPShell) getConn() (*httputil.ClientConn, error) {
 	dial, err := net.Dial("tcp", s.host)
 	if err != nil {
-		return nil, fmt.Errorf("Can't connect to %v", s.host)
+		return nil, fmt.Errorf("Can't connect to %s", s.host)
 	}
 	return httputil.NewClientConn(dial, nil), nil
 }

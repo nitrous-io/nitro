@@ -23,23 +23,23 @@ const (
 )
 
 type shell struct {
-	Id string `json:"id"`
+	ID string `json:"id"`
 }
 
 type HTTPShell struct {
-	Id          string `json:"id"`
+	ID          string `json:"id"`
 	host        string
-	containerId string
+	containerID string
 }
 
-func NewHTTPShell(host, containerId string) *HTTPShell {
-	return &HTTPShell{host: host, containerId: containerId}
+func NewHTTPShell(host, containerID string) *HTTPShell {
+	return &HTTPShell{host: host, containerID: containerID}
 }
 
 // request a new shell id. This will create a remote shell on the specified
 // container
 func (s *HTTPShell) RequestShell() error {
-	endpoint := fmt.Sprintf("/containers/%s/shells", s.containerId)
+	endpoint := fmt.Sprintf("/containers/%s/shells", s.containerID)
 	req, err := http.NewRequest("POST", endpoint, nil)
 	if err != nil {
 		return err
@@ -54,14 +54,14 @@ func (s *HTTPShell) RequestShell() error {
 	resp, err := c.Do(req)
 	if err != nil {
 		return fmt.Errorf("Failed to get a remote shell for container %s, error %v",
-			s.containerId, err)
+			s.containerID, err)
 	}
 	if resp.StatusCode == http.StatusNotFound {
-		return fmt.Errorf("Missing container %s", s.containerId)
+		return fmt.Errorf("Missing container %s", s.containerID)
 	}
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("Failed to get a remote shell for container %s, status %d",
-			s.containerId, resp.StatusCode)
+			s.containerID, resp.StatusCode)
 	}
 
 	return json.NewDecoder(resp.Body).Decode(s)
@@ -77,7 +77,7 @@ func (s *HTTPShell) Attach(fd uintptr, stdin io.Reader, stdout io.Writer) error 
 	}
 	defer term.RestoreTerminal(fd, oldState)
 
-	endpoint := fmt.Sprintf("/shells/%s/attach", s.Id)
+	endpoint := fmt.Sprintf("/shells/%s/attach", s.ID)
 	req, err := http.NewRequest("POST", endpoint, nil)
 	if err != nil {
 		return err
@@ -93,7 +93,7 @@ func (s *HTTPShell) Attach(fd uintptr, stdin io.Reader, stdout io.Writer) error 
 	resp, _ := c.Do(req)
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("Failed to attach to the remote shell for container %s, status %d",
-			s.containerId, resp.StatusCode)
+			s.containerID, resp.StatusCode)
 	}
 
 	// hijack the http . We have the stream writer and reader now
@@ -136,7 +136,7 @@ func (s *HTTPShell) resize(fd uintptr) error {
 	values.Set("width", strconv.Itoa(w))
 	values.Set("height", strconv.Itoa(h))
 	req, err := http.NewRequest("POST",
-		fmt.Sprintf("/shells/%s/resize", s.Id),
+		fmt.Sprintf("/shells/%s/resize", s.ID),
 		bytes.NewBufferString(values.Encode()))
 	if err != nil {
 		return err
@@ -151,10 +151,10 @@ func (s *HTTPShell) resize(fd uintptr) error {
 	defer c.Close()
 	resp, err := c.Do(req)
 	if err != nil {
-		return fmt.Errorf("Failed to resize session %s, err: %v", s.Id, err)
+		return fmt.Errorf("Failed to resize session %s, err: %v", s.ID, err)
 	}
 	if resp.StatusCode != http.StatusAccepted {
-		return fmt.Errorf("Failed to resize session %s, status %d", s.Id, resp.StatusCode)
+		return fmt.Errorf("Failed to resize session %s, status %d", s.ID, resp.StatusCode)
 	}
 	return nil
 }

@@ -49,11 +49,11 @@ func (c *LogoutCommand) Run(args []string) int {
 
 	err = os.Remove(c.TokenFilePath)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Failed to logout from Nitrous.IO."))
+		c.UI.Error("Failed to logout from Nitrous.IO.")
 		return 1
 	}
 
-	c.UI.Info(fmt.Sprintf("Successfully logged out from Nitrous.IO"))
+	c.UI.Info("Successfully logged out from Nitrous.IO")
 	return 0
 }
 

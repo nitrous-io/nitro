@@ -8,7 +8,7 @@ import (
 
 	"github.com/mitchellh/cli"
 	"github.com/nitrous-io/nitro/command"
-	"github.com/nitrous-io/nitro/command/utils"
+	"github.com/nitrous-io/nitro/command/config"
 	flag "github.com/ogier/pflag"
 )
 
@@ -30,7 +30,7 @@ func init() {
 func NewLogoutCommand() (cli.Command, error) {
 	return &LogoutCommand{
 		UI:            command.DefaultUI,
-		TokenFilePath: utils.TokenFilePath(),
+		TokenFilePath: config.TokenFilePath(),
 	}, nil
 }
 

@@ -4,7 +4,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/nitrous-io/nitro/command/utils"
+	"github.com/nitrous-io/nitro/command/config"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -40,7 +40,7 @@ var _ = Describe("Utils", func() {
 			})
 
 			It("returns the read config", func() {
-				config, err := utils.LoadConfig()
+				config, err := config.LoadConfig()
 				Expect(err).NotTo(HaveOccurred())
 				Expect(config.Server).To(Equal("https://www.example.com"))
 			})
@@ -48,7 +48,7 @@ var _ = Describe("Utils", func() {
 
 		Context("When config file does not exist", func() {
 			It("Returns an Error", func() {
-				_, err := utils.LoadConfig()
+				_, err := config.LoadConfig()
 				Expect(err).Should(HaveOccurred())
 			})
 		})
@@ -56,7 +56,7 @@ var _ = Describe("Utils", func() {
 
 	Describe("TokenFilePath", func() {
 		It("returns a path to a dotfile in home directory", func() {
-			Expect(utils.TokenFilePath()).To(Equal("/tmp/.nitrotoken"))
+			Expect(config.TokenFilePath()).To(Equal("/tmp/.nitrotoken"))
 		})
 	})
 })

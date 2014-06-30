@@ -8,8 +8,8 @@ import (
 	"os"
 
 	"github.com/mitchellh/cli"
+	"github.com/nitrous-io/nitro/command/config"
 	. "github.com/nitrous-io/nitro/command/login"
-	"github.com/nitrous-io/nitro/command/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -45,9 +45,8 @@ func authTestServer(username, password string) *httptest.Server {
 
 var _ = Describe("LoginCommand", func() {
 	var (
-		cmd    *LoginCommand
-		ui     *cli.MockUi
-		config *utils.Config
+		cmd *LoginCommand
+		ui  *cli.MockUi
 
 		username   string
 		password   string
@@ -62,7 +61,7 @@ var _ = Describe("LoginCommand", func() {
 		testServer = authTestServer(username, password)
 
 		ui = &cli.MockUi{}
-		config = &utils.Config{
+		c := &config.Config{
 			ClientID:     "client_id",
 			ClientSecret: "client_secret",
 			Server:       testServer.URL,
@@ -70,7 +69,7 @@ var _ = Describe("LoginCommand", func() {
 		cmd = &LoginCommand{
 			UI:            ui,
 			TokenFilePath: "/tmp/.nitrotoken",
-			Config:        config,
+			Config:        c,
 		}
 	})
 

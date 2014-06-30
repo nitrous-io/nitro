@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/nitrous-io/nitro/command/utils"
+	"github.com/nitrous-io/nitro/command/config"
 )
 
-func GetAccessToken(username, password string, config *utils.Config) (string, error) {
+func GetAccessToken(username, password string, config *config.Config) (string, error) {
 	p := url.Values{}
 	p.Set("grant_type", "password")
 	p.Set("username", username)

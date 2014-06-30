@@ -8,7 +8,7 @@ import (
 	"github.com/howeyc/gopass"
 	"github.com/mitchellh/cli"
 	"github.com/nitrous-io/nitro/command"
-	"github.com/nitrous-io/nitro/command/utils"
+	"github.com/nitrous-io/nitro/command/config"
 	"github.com/nitrous-io/nitro/user"
 	flag "github.com/ogier/pflag"
 )
@@ -32,7 +32,7 @@ Options:
 type LoginCommand struct {
 	UI            cli.Ui
 	TokenFilePath string
-	Config        *utils.Config
+	Config        *config.Config
 }
 
 func init() {
@@ -40,14 +40,14 @@ func init() {
 }
 
 func NewLoginCommand() (cli.Command, error) {
-	config, err := utils.LoadConfig()
+	c, err := config.LoadConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config file")
 	}
 	return &LoginCommand{
 		UI:            command.DefaultUI,
-		TokenFilePath: utils.TokenFilePath(),
-		Config:        config,
+		TokenFilePath: config.TokenFilePath(),
+		Config:        c,
 	}, nil
 }
 

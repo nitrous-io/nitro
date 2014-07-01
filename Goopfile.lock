@@ -1,6 +1,6 @@
 github.com/mitchellh/cli #df3e8ad8d1c3d317943c5b9c1538828b5f23cfb2
-github.com/howeyc/gopass #e8c0d21f59eb7f01086a39e47e05568acc9bb736
 github.com/ogier/pflag #e4f7d00f344b0954fa3791a8527d10ba7334eceb
 github.com/bgentry/go-netrc/netrc #9fd32a8b3d3d3f9d43c341bfe098430e07609480
+github.com/bgentry/speakeasy #5dfe43257d1f86b96484e760f2f0c4e2559089c7
 github.com/onsi/ginkgo/ginkgo #12446bbcc74950944c897e32ea99cc8d058f9c92
 github.com/onsi/gomega #036273e6f643552b16fe7a6464afd2ae0324992e

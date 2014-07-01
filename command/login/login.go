@@ -2,9 +2,10 @@ package login
 
 import (
 	"fmt"
+
 	"strings"
 
-	"github.com/howeyc/gopass"
+	"github.com/bgentry/speakeasy"
 	"github.com/mitchellh/cli"
 	"github.com/nitrous-io/nitro/auth"
 	"github.com/nitrous-io/nitro/command"
@@ -66,16 +67,19 @@ func (c *LoginCommand) Run(args []string) int {
 		username, err = c.UI.Ask("Username:")
 		if err != nil {
 			if err.Error() == "interrupted" {
-				return 2
+				c.UI.Error("Login cancelled.")
+				return 130
 			}
 			c.UI.Error(fmt.Sprintf("An unexpected error has occurred: %v", err))
 		}
 	}
 	if password == "" {
-		c.UI.Output("Password (will not be echoed): ")
-		p := gopass.GetPasswd()
-		password = string(p)
+		password, err = speakeasy.Ask("Password (will not be echoed): ")
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("An unexpected error has occurred: %v", err))
+		}
 	}
+
 	username = strings.TrimSpace(username)
 	password = strings.TrimSpace(password)
 

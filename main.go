@@ -8,6 +8,7 @@ import (
 	"github.com/nitrous-io/nitro/command"
 
 	// import all individual commands here so they register themselves in init()
+	_ "github.com/nitrous-io/nitro/command/export"
 	_ "github.com/nitrous-io/nitro/command/login"
 )
 

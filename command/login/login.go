@@ -2,14 +2,13 @@ package login
 
 import (
 	"fmt"
-	"io/ioutil"
 	"strings"
 
 	"github.com/howeyc/gopass"
 	"github.com/mitchellh/cli"
+	"github.com/nitrous-io/nitro/auth"
 	"github.com/nitrous-io/nitro/command"
 	"github.com/nitrous-io/nitro/command/config"
-	"github.com/nitrous-io/nitro/user"
 	flag "github.com/ogier/pflag"
 )
 
@@ -30,9 +29,8 @@ Options:
 `
 
 type LoginCommand struct {
-	UI            cli.Ui
-	TokenFilePath string
-	Server        string
+	UI     cli.Ui
+	Server string
 }
 
 func init() {
@@ -41,9 +39,8 @@ func init() {
 
 func NewLoginCommand() (cli.Command, error) {
 	return &LoginCommand{
-		UI:            command.DefaultUI,
-		TokenFilePath: config.TokenFilePath(),
-		Server:        config.APIServer(),
+		UI:     command.DefaultUI,
+		Server: config.APIServer(),
 	}, nil
 }
 
@@ -82,13 +79,13 @@ func (c *LoginCommand) Run(args []string) int {
 	username = strings.TrimSpace(username)
 	password = strings.TrimSpace(password)
 
-	accessToken, err := user.GetAccessToken(username, password, c.Server)
+	accessToken, err := auth.FetchToken(c.Server, username, password)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Failed to login: %v", err))
 		return 1
 	}
 
-	err = ioutil.WriteFile(c.TokenFilePath, []byte(accessToken), 0644)
+	err = auth.SaveToken(c.Server, username, accessToken)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Error occurred when saving the access token: %v", err))
 		return 1

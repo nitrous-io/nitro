@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 )
 
+const netrcFilename = ".netrc" // assuming CLI will run on Unix based systems for now
+
 func APIServer() string {
 	server := os.Getenv("NITRO_API_URL")
 
@@ -15,7 +17,13 @@ func APIServer() string {
 	return server
 }
 
-func TokenFilePath() string {
-	// FIXME correct path for the token file
-	return filepath.Join(os.Getenv("HOME"), ".nitrotoken")
+func NetRcPath() string {
+	netRcPath := os.Getenv("NETRC_PATH")
+	if netRcPath != "" {
+		return netRcPath
+	}
+
+	// Assumptions: CLI is running on Unix based systems
+	//							User hasn't modified the default HOME env.
+	return filepath.Join(os.Getenv("HOME"), netrcFilename)
 }

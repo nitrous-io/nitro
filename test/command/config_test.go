@@ -1,7 +1,8 @@
-package commandtest
+package config_test
 
 import (
 	"os"
+	"testing"
 
 	"github.com/nitrous-io/nitro/command/config"
 
@@ -9,17 +10,12 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Utils", func() {
-	var currentHome string
-	BeforeEach(func() {
-		currentHome = os.Getenv("HOME")
-		os.Setenv("HOME", "/tmp")
-	})
+func TestContext(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "config")
+}
 
-	AfterEach(func() {
-		os.Setenv("HOME", currentHome)
-	})
-
+var _ = Describe("Config", func() {
 	Describe("APIServer", func() {
 		Context("when NITRO_API_URL env variable is empty", func() {
 			It("returns the default server host", func() {
@@ -42,9 +38,39 @@ var _ = Describe("Utils", func() {
 		})
 	})
 
-	Describe("TokenFilePath", func() {
-		It("returns a path to a dotfile in home directory", func() {
-			Expect(config.TokenFilePath()).To(Equal("/tmp/.nitrotoken"))
+	Describe("NetRcPath", func() {
+		Context("When NETRC_PATH env variable is set", func() {
+			var currentNetrcPath string
+
+			BeforeEach(func() {
+				currentNETRCPath = os.Getenv("NETRC_PATH")
+				os.Setenv("NETRC_PATH", "/fake/fs/.netrc")
+			})
+
+			AfterEach(func() {
+				os.Setenv("NETRC_PATH", currentNetrcPath)
+			})
+
+			It("returns the path set in NETRC_PATH env variable", func() {
+				Expect(config.NetrcPath()).To(Equal("/fake/fs/.netrc"))
+			})
+		})
+
+		Context("When NETRC_PATH env variable is not set", func() {
+			var currentNetrcPath string
+
+			BeforeEach(func() {
+				currentNETRCPath = os.Getenv("NETRC_PATH")
+				os.Setenv("NETRC_PATH", "")
+			})
+
+			AfterEach(func() {
+				os.Setenv("NETRC_PATH", currentNetrcPath)
+			})
+
+			It("returns the path to .netrc in user's home directory", func() {
+				Expect(config.NetrcPath()).To(MatchRegexp(`^\/home\/*\/.netrc$`))
+			})
 		})
 	})
 })

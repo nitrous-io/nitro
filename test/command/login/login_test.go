@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 
+	"github.com/bgentry/go-netrc/netrc"
 	"github.com/mitchellh/cli"
 	. "github.com/nitrous-io/nitro/command/login"
 
@@ -28,7 +29,7 @@ func authTestServer(username, password string) *httptest.Server {
 		}
 		var m message
 		if username == u && password == p {
-			m = message{AccessToken: "abcd1234"}
+			m = message{AccessToken: "access_token"}
 		} else {
 			m = message{Error: "invalid_login", ErrorDescription: "Cannot login with the provided credentials"}
 			w.WriteHeader(401)
@@ -51,6 +52,9 @@ var _ = Describe("LoginCommand", func() {
 		password   string
 		args       []string
 		testServer *httptest.Server
+
+		currentNetrcPath string
+		testNetrcPath    string
 	)
 
 	BeforeEach(func() {
@@ -61,14 +65,19 @@ var _ = Describe("LoginCommand", func() {
 
 		ui = &cli.MockUi{}
 		cmd = &LoginCommand{
-			UI:            ui,
-			TokenFilePath: "/tmp/.nitrotoken",
-			Server:        testServer.URL,
+			UI:     ui,
+			Server: testServer.URL,
 		}
+
+		testNetrcPath = "/tmp/netrc"
+		currentNetrcPath = os.Getenv("NETRC_PATH")
+		os.Setenv("NETRC_PATH", testNetrcPath)
 	})
 
 	AfterEach(func() {
 		testServer.Close()
+
+		os.Setenv("NETRC_PATH", currentNetrcPath)
 	})
 
 	It("implements cli.Command", func() {
@@ -87,16 +96,19 @@ var _ = Describe("LoginCommand", func() {
 		})
 
 		AfterEach(func() {
-			err := os.Remove("/tmp/.nitrotoken")
+			err := os.Remove(testNetrcPath)
 			if err != nil {
 				panic(err)
 			}
 		})
 
-		It("writes the access token to .nitrotoken file", func() {
-			token, err := ioutil.ReadFile("/tmp/.nitrotoken")
-			Expect(string(token[:])).To(Equal("abcd1234"))
-			Expect(err).To(BeNil())
+		It("adds a new token to the Netrc file", func() {
+			m, err := netrc.FindMachine(testNetrcPath, testServer.URL)
+			if err != nil {
+				Fail(err.Error())
+			}
+			Expect(m.Login).To(Equal(username))
+			Expect(m.Password).To(Equal("access_token"))
 		})
 
 		It("prints a message saying logged in as the given username", func() {
@@ -115,8 +127,8 @@ var _ = Describe("LoginCommand", func() {
 			Expect(exitCode).To(Equal(1))
 		})
 
-		It("doesnt write the access token to .nitrotoken file", func() {
-			_, err := ioutil.ReadFile("/tmp/.nitrotoken")
+		It("doesnt add a new token to the Netrc file", func() {
+			_, err := ioutil.ReadFile(testNetrcPath)
 			Expect(err).NotTo(BeNil())
 		})
 

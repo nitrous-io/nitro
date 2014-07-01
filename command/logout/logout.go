@@ -2,11 +2,11 @@ package logout
 
 import (
 	"fmt"
-	"os"
 
 	"strings"
 
 	"github.com/mitchellh/cli"
+	"github.com/nitrous-io/nitro/auth"
 	"github.com/nitrous-io/nitro/command"
 	"github.com/nitrous-io/nitro/command/config"
 	flag "github.com/ogier/pflag"
@@ -19,8 +19,8 @@ Usage: nitro logout
 `
 
 type LogoutCommand struct {
-	UI            cli.Ui
-	TokenFilePath string
+	UI     cli.Ui
+	Server string
 }
 
 func init() {
@@ -29,8 +29,8 @@ func init() {
 
 func NewLogoutCommand() (cli.Command, error) {
 	return &LogoutCommand{
-		UI:            command.DefaultUI,
-		TokenFilePath: config.TokenFilePath(),
+		UI:     command.DefaultUI,
+		Server: config.APIServer(),
 	}, nil
 }
 
@@ -47,13 +47,13 @@ func (c *LogoutCommand) Run(args []string) int {
 		return 1
 	}
 
-	err = os.Remove(c.TokenFilePath)
+	err = auth.RemoveToken(c.Server)
 	if err != nil {
-		c.UI.Error("Failed to logout from Nitrous.IO.")
+		c.UI.Error("Failed to remove the token.")
 		return 1
 	}
 
-	c.UI.Info("Successfully logged out from Nitrous.IO")
+	c.UI.Info("You are no longer logged-in to Nitrous.IO")
 	return 0
 }
 

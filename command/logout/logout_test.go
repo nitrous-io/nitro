@@ -1,8 +1,9 @@
-package logouttest
+package logout_test
 
 import (
 	"io/ioutil"
 	"os"
+	"testing"
 
 	"github.com/bgentry/go-netrc/netrc"
 	"github.com/mitchellh/cli"
@@ -11,6 +12,11 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
+
+func TestLogout(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "logout")
+}
 
 var _ = Describe("LogoutCommand", func() {
 	var (

@@ -1,4 +1,4 @@
-package logintest
+package login_test
 
 import (
 	"encoding/json"
@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"testing"
 
 	"github.com/bgentry/go-netrc/netrc"
 	"github.com/mitchellh/cli"
@@ -14,6 +15,11 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
+
+func TestLogin(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "login")
+}
 
 func authTestServer(username, password string) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

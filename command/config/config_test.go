@@ -43,7 +43,7 @@ var _ = Describe("Config", func() {
 			var currentNetrcPath string
 
 			BeforeEach(func() {
-				currentNETRCPath = os.Getenv("NETRC_PATH")
+				currentNetrcPath = os.Getenv("NETRC_PATH")
 				os.Setenv("NETRC_PATH", "/fake/fs/.netrc")
 			})
 
@@ -52,7 +52,7 @@ var _ = Describe("Config", func() {
 			})
 
 			It("returns the path set in NETRC_PATH env variable", func() {
-				Expect(config.NetrcPath()).To(Equal("/fake/fs/.netrc"))
+				Expect(config.NetRcPath()).To(Equal("/fake/fs/.netrc"))
 			})
 		})
 
@@ -60,7 +60,7 @@ var _ = Describe("Config", func() {
 			var currentNetrcPath string
 
 			BeforeEach(func() {
-				currentNETRCPath = os.Getenv("NETRC_PATH")
+				currentNetrcPath = os.Getenv("NETRC_PATH")
 				os.Setenv("NETRC_PATH", "")
 			})
 
@@ -69,7 +69,7 @@ var _ = Describe("Config", func() {
 			})
 
 			It("returns the path to .netrc in user's home directory", func() {
-				Expect(config.NetrcPath()).To(MatchRegexp(`^\/home\/*\/.netrc$`))
+				Expect(config.NetRcPath()).To(MatchRegexp(`^/home/.*/.netrc$`))
 			})
 		})
 	})

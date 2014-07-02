@@ -8,9 +8,17 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/bgentry/go-netrc/netrc"
 	"github.com/nitrous-io/nitro/command/config"
 )
+
+type AuthConfig struct {
+	Username string `json:"username"`
+	Token    string `json:"auth"`
+}
+
+type ConfigFile struct {
+	Configs map[string]AuthConfig `json:"configs"`
+}
 
 func FetchToken(server, username, password string) (string, error) {
 	p := url.Values{}
@@ -46,49 +54,61 @@ func FetchToken(server, username, password string) (string, error) {
 	}
 }
 
-func loadNetRc() (*netrc.Netrc, error) {
-	nrc, err := netrc.ParseFile(config.NetRcPath())
+func LoadConfig(path string) (*ConfigFile, error) {
+	configFile := ConfigFile{Configs: make(map[string]AuthConfig)}
+	fd, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return &netrc.Netrc{}, nil
+			return &configFile, nil
 		}
 		return nil, err
 	}
+	defer fd.Close()
 
-	return nrc, nil
+	b, err := ioutil.ReadAll(fd)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(b, &configFile.Configs)
+	if err != nil {
+		return nil, err
+	}
+
+	return &configFile, nil
 }
 
-func SaveToken(host, user, token string) error {
-	nrc, err := loadNetRc()
+func SaveConfig(path string, configFile *ConfigFile) error {
+	b, err := json.Marshal(&configFile.Configs)
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(path, b, 0600)
+}
+
+func SaveToken(host, username, token string) error {
+	configPath := config.AuthConfigPath()
+	c, err := LoadConfig(configPath)
 	if err != nil {
 		return err
 	}
 
-	m := nrc.FindMachine(host)
-	if m == nil || m.IsDefault() {
-		m = nrc.NewMachine(host, user, token, "")
-	}
-	m.UpdateLogin(user)
-	m.UpdatePassword(token)
+	authConfig := AuthConfig{}
+	authConfig.Username = username
+	authConfig.Token = token
+	c.Configs[host] = authConfig
 
-	body, err := nrc.MarshalText()
-	if err != nil {
-		return err
-	}
-	return ioutil.WriteFile(config.NetRcPath(), body, 0600)
+	return SaveConfig(configPath, c)
 }
 
 func RemoveToken(host string) error {
-	nrc, err := loadNetRc()
+	configPath := config.AuthConfigPath()
+	c, err := LoadConfig(configPath)
 	if err != nil {
 		return err
 	}
 
-	nrc.RemoveMachine(host)
+	delete(c.Configs, host)
 
-	body, err := nrc.MarshalText()
-	if err != nil {
-		return err
-	}
-	return ioutil.WriteFile(config.NetRcPath(), body, 0600)
+	return SaveConfig(configPath, c)
 }

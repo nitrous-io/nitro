@@ -38,38 +38,38 @@ var _ = Describe("Config", func() {
 		})
 	})
 
-	Describe("NetRcPath", func() {
-		Context("When NETRC_PATH env variable is set", func() {
-			var currentNetrcPath string
+	Describe("AuthConfigPath", func() {
+		Context("When NITRO_AUTH_CONFIG_PATH env variable is set", func() {
+			var currentAuthConfigPath string
 
 			BeforeEach(func() {
-				currentNetrcPath = os.Getenv("NETRC_PATH")
-				os.Setenv("NETRC_PATH", "/fake/fs/.netrc")
+				currentAuthConfigPath = os.Getenv("NITRO_AUTH_CONFIG_PATH")
+				os.Setenv("NITRO_AUTH_CONFIG_PATH", "/fake/fs/.netrc")
 			})
 
 			AfterEach(func() {
-				os.Setenv("NETRC_PATH", currentNetrcPath)
+				os.Setenv("NITRO_AUTH_CONFIG_PATH", currentAuthConfigPath)
 			})
 
-			It("returns the path set in NETRC_PATH env variable", func() {
-				Expect(config.NetRcPath()).To(Equal("/fake/fs/.netrc"))
+			It("returns the path set in NITRO_AUTH_CONFIG_PATH env variable", func() {
+				Expect(config.AuthConfigPath()).To(Equal("/fake/fs/.netrc"))
 			})
 		})
 
-		Context("When NETRC_PATH env variable is not set", func() {
-			var currentNetrcPath string
+		Context("When NITRO_AUTH_CONFIG_PATH env variable is not set", func() {
+			var currentAuthConfigPath string
 
 			BeforeEach(func() {
-				currentNetrcPath = os.Getenv("NETRC_PATH")
-				os.Setenv("NETRC_PATH", "")
+				currentAuthConfigPath = os.Getenv("NITRO_AUTH_CONFIG_PATH")
+				os.Setenv("NITRO_AUTH_CONFIG_PATH", "")
 			})
 
 			AfterEach(func() {
-				os.Setenv("NETRC_PATH", currentNetrcPath)
+				os.Setenv("NITRO_AUTH_CONFIG_PATH", currentAuthConfigPath)
 			})
 
-			It("returns the path to .netrc in user's home directory", func() {
-				Expect(config.NetRcPath()).To(MatchRegexp(`^/home/.*/.netrc$`))
+			It("returns the path to .nitrocfg in user's home directory", func() {
+				Expect(config.AuthConfigPath()).To(MatchRegexp(`^/home/.*/.nitrocfg$`))
 			})
 		})
 	})

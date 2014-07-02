@@ -2,15 +2,13 @@ package login_test
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 
-	"github.com/bgentry/go-netrc/netrc"
 	"github.com/mitchellh/cli"
-	"github.com/nitrous-io/nitro/command/config"
+	"github.com/nitrous-io/nitro/auth"
 	. "github.com/nitrous-io/nitro/command/login"
 
 	. "github.com/onsi/ginkgo"
@@ -60,8 +58,8 @@ var _ = Describe("LoginCommand", func() {
 		args       []string
 		testServer *httptest.Server
 
-		currentNetrcPath string
-		testNetrcPath    string
+		currentAuthConfigPath string
+		testAuthConfigPath    string
 	)
 
 	BeforeEach(func() {
@@ -76,15 +74,15 @@ var _ = Describe("LoginCommand", func() {
 			Server: testServer.URL,
 		}
 
-		testNetrcPath = "/tmp/netrc"
-		currentNetrcPath = os.Getenv("NETRC_PATH")
-		os.Setenv("NETRC_PATH", testNetrcPath)
+		testAuthConfigPath = "/tmp/authcfg"
+		currentAuthConfigPath = os.Getenv("NITRO_AUTH_CONFIG_PATH")
+		os.Setenv("NITRO_AUTH_CONFIG_PATH", testAuthConfigPath)
 	})
 
 	AfterEach(func() {
 		testServer.Close()
 
-		os.Setenv("NETRC_PATH", currentNetrcPath)
+		os.Setenv("NITRO_AUTH_CONFIG_PATH", currentAuthConfigPath)
 	})
 
 	It("implements cli.Command", func() {
@@ -103,19 +101,19 @@ var _ = Describe("LoginCommand", func() {
 		})
 
 		AfterEach(func() {
-			err := os.Remove(testNetrcPath)
+			err := os.Remove(testAuthConfigPath)
 			if err != nil {
 				panic(err)
 			}
 		})
 
-		It("adds a new token to the Netrc file", func() {
-			m, err := netrc.FindMachine(testNetrcPath, testServer.URL)
+		It("adds a new token to the auth config file", func() {
+			c, err := auth.LoadConfig(testAuthConfigPath)
 			if err != nil {
 				Fail(err.Error())
 			}
-			Expect(m.Login).To(Equal(username))
-			Expect(m.Password).To(Equal("access_token"))
+			Expect(c.Configs[testServer.URL].Username).To(Equal(username))
+			Expect(c.Configs[testServer.URL].Token).To(Equal("access_token"))
 		})
 
 		It("prints a message saying logged in as the given username", func() {
@@ -130,16 +128,17 @@ var _ = Describe("LoginCommand", func() {
 				"-p", "bar",
 			}
 
-			// create an empty netrc file
-			ioutil.WriteFile(config.NetRcPath(), []byte{}, 0600)
-
 			exitCode := cmd.Run(args)
 			Expect(exitCode).To(Equal(1))
 		})
 
-		It("doesnt add a new token to the Netrc file", func() {
-			i, _ := ioutil.ReadFile(testNetrcPath)
-			Expect(i).To(BeEmpty()) // nothing should've been added to the Netrc file
+		It("does not add a new token to the auth config file", func() {
+			c, err := auth.LoadConfig(testAuthConfigPath)
+			if err != nil {
+				Fail(err.Error())
+			}
+			Expect(c.Configs[testServer.URL].Username).To(BeEmpty())
+			Expect(c.Configs[testServer.URL].Token).To(BeEmpty())
 		})
 
 		It("prints a message saying failed to authenticate", func() {

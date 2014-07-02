@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 )
 
-const netrcFilename = ".netrc" // assuming CLI will run on Unix based systems for now
+const authConfigFilename = ".nitrocfg" // assuming CLI will run on Unix based systems for now
 
 func APIServerURL() string {
 	server := os.Getenv("NITRO_API_URL")
@@ -17,13 +17,13 @@ func APIServerURL() string {
 	return server
 }
 
-func NetRcPath() string {
-	netRcPath := os.Getenv("NETRC_PATH")
-	if netRcPath != "" {
-		return netRcPath
+func AuthConfigPath() string {
+	authConfigPath := os.Getenv("NITRO_AUTH_CONFIG_PATH")
+	if authConfigPath != "" {
+		return authConfigPath
 	}
 
 	// Assumptions: CLI is running on Unix based systems
 	//							User hasn't modified the default HOME env.
-	return filepath.Join(os.Getenv("HOME"), netrcFilename)
+	return filepath.Join(os.Getenv("HOME"), authConfigFilename)
 }

@@ -1,4 +1,4 @@
-package shelltest
+package shell
 
 import (
 	"bytes"
@@ -8,11 +8,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"testing"
 
-	"github.com/dotcloud/docker/vendor/src/github.com/kr/pty"
 	"github.com/gorilla/mux"
+	"github.com/kr/pty"
 	"github.com/mitchellh/cli"
-	. "github.com/nitrous-io/nitro/command/shell"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -78,6 +78,11 @@ func newTestServer(containerId, shellId string) *testServer {
 	srv := httptest.NewServer(r)
 	s.srv = srv
 	return s
+}
+
+func TestShell(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "shell")
 }
 
 var _ = Describe("ShellCommand", func() {

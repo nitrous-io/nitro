@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	"github.com/gorilla/mux"
@@ -63,6 +62,11 @@ func (s *testServer) resizeShell(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+func (s *testServer) Close() {
+	s.srv.CloseClientConnections()
+	s.srv.Close()
+}
+
 func newTestServer(containerId, shellId string) *testServer {
 	s := &testServer{
 		containerId: containerId,
@@ -86,61 +90,43 @@ func TestShell(t *testing.T) {
 }
 
 var _ = Describe("ShellCommand", func() {
-	var (
-		cmd *ShellCommand
-		ui  *cli.BasicUi
+	It("requires host and container name", func() {
+		testCases := [][]string{
+			{},
+			{"only-host"},
+		}
+		for _, tc := range testCases {
+			cmd := &ShellCommand{UI: &cli.MockUi{}}
+			code := cmd.Run(tc)
+			Expect(code).To(Equal(1), "Expect command to fail with status %d", 1)
+		}
+	})
 
-		host        string
-		containerId string
-		args        []string
-		shellId     string
+	It("attaches to the remote shell", func() {
+		containerID := "best-container"
+		ts := newTestServer(containerID, "shell-id")
+		defer ts.Close()
 
-		srv *testServer
-
-		stdin, stdout *os.File
-	)
-
-	BeforeEach(func() {
-		stdin, stdout, _ = pty.Open()
-		ui = &cli.BasicUi{
+		stdin, stdout, _ := pty.Open()
+		ui := &cli.BasicUi{
 			Reader:      stdin,
 			Writer:      stdout,
 			ErrorWriter: bytes.NewBuffer(nil),
 		}
-		cmd = &ShellCommand{UI: ui}
+		cmd := &ShellCommand{UI: ui}
 
-		containerId = "best-container"
-		shellId = "current-shell"
-
-		srv = newTestServer(containerId, shellId)
-
-		host = srv.srv.Listener.Addr().String()
-
-		args = []string{host, containerId}
-	})
-
-	AfterEach(func() {
-		srv.srv.CloseClientConnections()
-		srv.srv.Close()
-	})
-
-	It("implements cli.Command", func() {
-		var _ cli.Command = cmd
-	})
-
-	It("attaches to the remote shell", func() {
 		go func() {
 			defer GinkgoRecover()
-			cmd.Run(args)
+			cmd.Run([]string{ts.srv.Listener.Addr().String(), containerID})
 			Expect(ui.ErrorWriter.(*bytes.Buffer).String()).To(BeEmpty())
 		}()
 
 		Eventually(func() bool {
-			return srv.resized
+			return ts.resized
 		}).Should(BeTrue())
 
 		Eventually(func() bool {
-			return srv.finished
+			return ts.finished
 		}).Should(BeTrue())
 	})
 })

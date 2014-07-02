@@ -46,6 +46,10 @@ func (c *ShellCommand) Synopsis() string {
 }
 
 func (c *ShellCommand) Run(args []string) int {
+	if len(args) != 2 {
+		c.UI.Error(c.Help())
+		return 1
+	}
 	host := args[0]
 	container := args[1]
 

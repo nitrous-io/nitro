@@ -1,6 +1,6 @@
 github.com/mitchellh/cli !git@github.com:nitrous-io/cli
 github.com/ogier/pflag #e4f7d00f344b0954fa3791a8527d10ba7334eceb
-github.com/bgentry/speakeasy #5dfe43257d1f86b96484e760f2f0c4e2559089c7
+github.com/kr/pty #67e2db24c831afa6c64fc17b4a143390674365ef
 
 github.com/onsi/ginkgo/ginkgo #12446bbcc74950944c897e32ea99cc8d058f9c92
 github.com/onsi/gomega #036273e6f643552b16fe7a6464afd2ae0324992e

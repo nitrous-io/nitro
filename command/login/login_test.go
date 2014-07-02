@@ -106,8 +106,8 @@ var _ = Describe("LoginCommand", func() {
 		It("adds a new token to the auth config file", func() {
 			c, err := auth.LoadConfig(testConfigFile.Name())
 			Expect(err).To(BeNil())
-			Expect(c.Configs[testServer.URL].Username).To(Equal(username))
-			Expect(c.Configs[testServer.URL].Token).To(Equal("access_token"))
+			Expect(c.Auths[testServer.URL].Username).To(Equal(username))
+			Expect(c.Auths[testServer.URL].Token).To(Equal("access_token"))
 		})
 
 		It("prints a message saying logged in as the given username", func() {
@@ -129,8 +129,8 @@ var _ = Describe("LoginCommand", func() {
 		It("does not add a new token to the auth config file", func() {
 			c, err := auth.LoadConfig(testConfigFile.Name())
 			Expect(err).To(BeNil())
-			Expect(c.Configs[testServer.URL].Username).To(BeEmpty())
-			Expect(c.Configs[testServer.URL].Token).To(BeEmpty())
+			Expect(c.Auths[testServer.URL].Username).To(BeEmpty())
+			Expect(c.Auths[testServer.URL].Token).To(BeEmpty())
 		})
 
 		It("prints a message saying failed to authenticate", func() {

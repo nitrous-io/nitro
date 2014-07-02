@@ -17,7 +17,7 @@ type AuthConfig struct {
 }
 
 type ConfigFile struct {
-	Configs map[string]AuthConfig `json:"configs"`
+	Auths map[string]AuthConfig `json:"auths"`
 }
 
 func FetchToken(server, username, password string) (string, error) {
@@ -55,7 +55,7 @@ func FetchToken(server, username, password string) (string, error) {
 }
 
 func LoadConfig(path string) (*ConfigFile, error) {
-	configFile := ConfigFile{Configs: make(map[string]AuthConfig)}
+	configFile := ConfigFile{Auths: make(map[string]AuthConfig)}
 	fd, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -73,7 +73,7 @@ func LoadConfig(path string) (*ConfigFile, error) {
 		return &configFile, nil
 	}
 
-	err = json.Unmarshal(b, &configFile.Configs)
+	err = json.Unmarshal(b, &configFile.Auths)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func LoadConfig(path string) (*ConfigFile, error) {
 }
 
 func SaveConfig(path string, configFile *ConfigFile) error {
-	b, err := json.Marshal(&configFile.Configs)
+	b, err := json.Marshal(&configFile.Auths)
 	if err != nil {
 		return err
 	}
@@ -98,7 +98,7 @@ func SaveToken(host, username, token string) error {
 	authConfig := AuthConfig{}
 	authConfig.Username = username
 	authConfig.Token = token
-	c.Configs[host] = authConfig
+	c.Auths[host] = authConfig
 
 	return SaveConfig(command.Env.ConfigPath, c)
 }
@@ -109,7 +109,7 @@ func RemoveToken(host string) error {
 		return err
 	}
 
-	delete(c.Configs, host)
+	delete(c.Auths, host)
 
 	return SaveConfig(command.Env.ConfigPath, c)
 }

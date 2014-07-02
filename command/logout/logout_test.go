@@ -49,11 +49,11 @@ var _ = Describe("LogoutCommand", func() {
 
 	Context("when token exist in auth config file", func() {
 		BeforeEach(func() {
-			c := &auth.ConfigFile{Configs: make(map[string]auth.AuthConfig)}
+			c := &auth.ConfigFile{Auths: make(map[string]auth.AuthConfig)}
 			a := auth.AuthConfig{}
 			a.Username = "foo"
 			a.Token = "bar"
-			c.Configs["www.example.com"] = a
+			c.Auths["www.example.com"] = a
 
 			auth.SaveConfig(testConfigFile.Name(), c)
 		})
@@ -73,8 +73,8 @@ var _ = Describe("LogoutCommand", func() {
 			if err != nil {
 				Fail(err.Error())
 			}
-			Expect(c.Configs["www.example.com"].Username).To(BeEmpty())
-			Expect(c.Configs["www.example.com"].Token).To(BeEmpty())
+			Expect(c.Auths["www.example.com"].Username).To(BeEmpty())
+			Expect(c.Auths["www.example.com"].Token).To(BeEmpty())
 		})
 	})
 })

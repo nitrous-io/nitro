@@ -8,7 +8,6 @@ import (
 	"github.com/mitchellh/cli"
 	"github.com/nitrous-io/nitro/auth"
 	"github.com/nitrous-io/nitro/command"
-	"github.com/nitrous-io/nitro/command/config"
 	flag "github.com/ogier/pflag"
 )
 
@@ -30,7 +29,7 @@ func init() {
 func NewLogoutCommand() (cli.Command, error) {
 	return &LogoutCommand{
 		UI:     command.DefaultUI,
-		Server: config.APIServerURL(),
+		Server: command.Env.ApiURL,
 	}, nil
 }
 

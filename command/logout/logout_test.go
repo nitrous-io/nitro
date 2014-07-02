@@ -1,11 +1,13 @@
 package logout_test
 
 import (
+	"io/ioutil"
 	"os"
 	"testing"
 
 	"github.com/mitchellh/cli"
 	"github.com/nitrous-io/nitro/auth"
+	"github.com/nitrous-io/nitro/command"
 	. "github.com/nitrous-io/nitro/command/logout"
 
 	. "github.com/onsi/ginkgo"
@@ -23,21 +25,22 @@ var _ = Describe("LogoutCommand", func() {
 		ui   *cli.MockUi
 		args []string
 
-		currentAuthConfigPath string
-		testAuthConfigPath    string
+		testConfigFile *os.File
 	)
 
 	BeforeEach(func() {
 		ui = &cli.MockUi{}
 		cmd = &LogoutCommand{UI: ui, Server: "www.example.com"}
 
-		testAuthConfigPath = "/tmp/authcfg"
-		currentAuthConfigPath = os.Getenv("NITRO_AUTH_CONFIG_PATH")
-		os.Setenv("NITRO_AUTH_CONFIG_PATH", testAuthConfigPath)
+		f, err := ioutil.TempFile("", "nitrocfg")
+		Expect(err).To(BeNil())
+		testConfigFile = f
+		command.Env.ConfigPath = f.Name()
 	})
 
 	AfterEach(func() {
-		os.Setenv("NITRO_AUTH_CONFIG_PATH", currentAuthConfigPath)
+		testConfigFile.Close()
+		os.Remove(testConfigFile.Name())
 	})
 
 	It("implements cli.Command", func() {
@@ -52,11 +55,11 @@ var _ = Describe("LogoutCommand", func() {
 			a.Token = "bar"
 			c.Configs["www.example.com"] = a
 
-			auth.SaveConfig(testAuthConfigPath, c)
+			auth.SaveConfig(testConfigFile.Name(), c)
 		})
 
 		AfterEach(func() {
-			err := os.Remove(testAuthConfigPath)
+			err := os.Remove(testConfigFile.Name())
 			if err != nil {
 				panic(err)
 			}
@@ -66,7 +69,7 @@ var _ = Describe("LogoutCommand", func() {
 			exitCode := cmd.Run(args)
 			Expect(exitCode).To(Equal(0))
 
-			c, err := auth.LoadConfig(testAuthConfigPath)
+			c, err := auth.LoadConfig(testConfigFile.Name())
 			if err != nil {
 				Fail(err.Error())
 			}

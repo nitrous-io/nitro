@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/nitrous-io/nitro/command/config"
+	"github.com/nitrous-io/nitro/command"
 )
 
 type AuthConfig struct {
@@ -69,6 +69,9 @@ func LoadConfig(path string) (*ConfigFile, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(b) == 0 {
+		return &configFile, nil
+	}
 
 	err = json.Unmarshal(b, &configFile.Configs)
 	if err != nil {
@@ -87,8 +90,7 @@ func SaveConfig(path string, configFile *ConfigFile) error {
 }
 
 func SaveToken(host, username, token string) error {
-	configPath := config.AuthConfigPath()
-	c, err := LoadConfig(configPath)
+	c, err := LoadConfig(command.Env.ConfigPath)
 	if err != nil {
 		return err
 	}
@@ -98,17 +100,16 @@ func SaveToken(host, username, token string) error {
 	authConfig.Token = token
 	c.Configs[host] = authConfig
 
-	return SaveConfig(configPath, c)
+	return SaveConfig(command.Env.ConfigPath, c)
 }
 
 func RemoveToken(host string) error {
-	configPath := config.AuthConfigPath()
-	c, err := LoadConfig(configPath)
+	c, err := LoadConfig(command.Env.ConfigPath)
 	if err != nil {
 		return err
 	}
 
 	delete(c.Configs, host)
 
-	return SaveConfig(configPath, c)
+	return SaveConfig(command.Env.ConfigPath, c)
 }

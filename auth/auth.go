@@ -12,10 +12,6 @@ import (
 	"github.com/nitrous-io/nitro/command/config"
 )
 
-type NetRc struct {
-	netrc.Netrc
-}
-
 func FetchToken(server, username, password string) (string, error) {
 	p := url.Values{}
 	p.Set("grant_type", "password")
@@ -50,16 +46,16 @@ func FetchToken(server, username, password string) (string, error) {
 	}
 }
 
-func loadNetRc() (*NetRc, error) {
-	onrc, err := netrc.ParseFile(config.NetRcPath())
+func loadNetRc() (*netrc.Netrc, error) {
+	nrc, err := netrc.ParseFile(config.NetRcPath())
 	if err != nil {
 		if os.IsNotExist(err) {
-			return &NetRc{}, nil
+			return &netrc.Netrc{}, nil
 		}
 		return nil, err
 	}
 
-	return &NetRc{*onrc}, nil
+	return nrc, nil
 }
 
 func SaveToken(host, user, token string) error {

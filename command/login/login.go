@@ -41,7 +41,7 @@ func init() {
 func NewLoginCommand() (cli.Command, error) {
 	return &LoginCommand{
 		UI:     command.DefaultUI,
-		Server: config.APIServer(),
+		Server: config.APIServerURL(),
 	}, nil
 }
 

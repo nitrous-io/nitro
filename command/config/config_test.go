@@ -16,10 +16,10 @@ func TestContext(t *testing.T) {
 }
 
 var _ = Describe("Config", func() {
-	Describe("APIServer", func() {
+	Describe("APIServerURL", func() {
 		Context("when NITRO_API_URL env variable is empty", func() {
-			It("returns the default server host", func() {
-				Expect(config.APIServer()).To(Equal("http://0.0.0.0:3000"))
+			It("returns the default server url", func() {
+				Expect(config.APIServerURL()).To(Equal("http://0.0.0.0:3000"))
 			})
 		})
 
@@ -33,7 +33,7 @@ var _ = Describe("Config", func() {
 			})
 
 			It("returns server set in the env variable", func() {
-				Expect(config.APIServer()).To(Equal("https://www.example.com"))
+				Expect(config.APIServerURL()).To(Equal("https://www.example.com"))
 			})
 		})
 	})

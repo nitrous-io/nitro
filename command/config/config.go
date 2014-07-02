@@ -7,7 +7,7 @@ import (
 
 const netrcFilename = ".netrc" // assuming CLI will run on Unix based systems for now
 
-func APIServer() string {
+func APIServerURL() string {
 	server := os.Getenv("NITRO_API_URL")
 
 	if server == "" {

@@ -30,7 +30,7 @@ func init() {
 func NewLogoutCommand() (cli.Command, error) {
 	return &LogoutCommand{
 		UI:     command.DefaultUI,
-		Server: config.APIServer(),
+		Server: config.APIServerURL(),
 	}, nil
 }
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/bgentry/go-netrc/netrc"
 	"github.com/mitchellh/cli"
+	"github.com/nitrous-io/nitro/command/config"
 	. "github.com/nitrous-io/nitro/command/login"
 
 	. "github.com/onsi/ginkgo"
@@ -129,13 +130,16 @@ var _ = Describe("LoginCommand", func() {
 				"-p", "bar",
 			}
 
+			// create an empty netrc file
+			ioutil.WriteFile(config.NetRcPath(), []byte{}, 0600)
+
 			exitCode := cmd.Run(args)
 			Expect(exitCode).To(Equal(1))
 		})
 
 		It("doesnt add a new token to the Netrc file", func() {
-			_, err := ioutil.ReadFile(testNetrcPath)
-			Expect(err).NotTo(BeNil())
+			i, _ := ioutil.ReadFile(testNetrcPath)
+			Expect(i).To(BeEmpty()) // nothing should've been added to the Netrc file
 		})
 
 		It("prints a message saying failed to authenticate", func() {

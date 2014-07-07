@@ -7,18 +7,24 @@ import (
 
 	"github.com/mitchellh/cli"
 	"github.com/nitrous-io/nitro/command"
+	flag "github.com/ogier/pflag"
 )
 
 const (
-	defaultTerm = "xterm-256color"
-	synopsys    = "Open a shell on Nitrous.IO box"
+	usernameUsage = "Run as this user"
+	defaultTerm   = "xterm-256color"
+	synopsys      = "Open a shell on Nitrous.IO box"
 )
 
-const usage = `
+var usage = fmt.Sprintf(`
 Usage: nitro shell <host_name> <container_id>
 
 open a shell to a box on a Nitrous.IO zone
-`
+
+Options:
+
+  -u, --user=""    %s.
+`, usernameUsage)
 
 func init() {
 	command.Register("shell", NewShellCommand)
@@ -46,6 +52,17 @@ func (c *ShellCommand) Synopsis() string {
 }
 
 func (c *ShellCommand) Run(args []string) int {
+	var username string
+	cmdFlags := flag.NewFlagSet("shell", flag.ContinueOnError)
+	cmdFlags.Usage = func() { c.UI.Output(c.Help()) }
+	cmdFlags.StringVarP(&username, "user", "u", "", usernameUsage)
+
+	err := cmdFlags.Parse(args)
+	if err != nil {
+		return 1
+	}
+
+	args = cmdFlags.Args()
 	if len(args) != 2 {
 		c.UI.Error(c.Help())
 		return 1
@@ -53,7 +70,7 @@ func (c *ShellCommand) Run(args []string) int {
 	host := args[0]
 	container := args[1]
 
-	s := NewHTTPShell(host, container)
+	s := NewHTTPShell(host, container, username)
 
 	if err := s.RequestShell(); err != nil {
 		c.UI.Error(fmt.Sprintf("RequestShell: %v", err))

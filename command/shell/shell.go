@@ -41,7 +41,7 @@ func NewShellCommand() (cli.Command, error) {
 }
 
 type ShellCommand struct {
-	UI cli.Ui
+	UI *cli.BasicUi
 }
 
 func (c *ShellCommand) Help() string {
@@ -69,31 +69,21 @@ func (c *ShellCommand) Run(args []string) int {
 		return 1
 	}
 	host := args[0]
-	container := args[1]
+	containerID := args[1]
 	command := getLoginCommand(username)
 
-	s := httpshell.NewHTTPShell(host, container, command)
-
-	if err := s.RequestShell(); err != nil {
-		c.UI.Error(fmt.Sprintf("RequestShell: %v", err))
-		return 1
-	}
-
 	// prepare the term
-	ui, ok := c.UI.(*cli.BasicUi)
-	if !ok {
-		c.UI.Error("Invalid UI. Please check nitro configuration")
-		return 1
-	}
-	stdin := ui.Reader
-	stdout := ui.Writer
+	stdin := c.UI.Reader
+	stdout := c.UI.Writer
 	pty, ok := stdout.(*os.File)
 	if !ok {
 		c.UI.Error("nitro shell requires a working terminal")
 		return 1
 	}
-	if err := s.Attach(pty.Fd(), stdin, stdout); err != nil {
-		c.UI.Error(fmt.Sprintf("Shell detached %v", err))
+
+	err = httpshell.Run(host, containerID, command, pty.Fd(), stdin, stdout)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("Exited: %v", err))
 		return 1
 	}
 	return 0

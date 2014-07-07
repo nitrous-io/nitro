@@ -3,7 +3,6 @@ package run
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
@@ -29,9 +28,8 @@ type Command struct {
 func NewCommand() (cli.Command, error) {
 	return &Command{
 		UI: &cli.BasicUi{
-			Reader:      os.Stdin,
-			Writer:      os.Stdout,
-			ErrorWriter: os.Stderr,
+			Reader: os.Stdin,
+			Writer: os.Stdout,
 		},
 	}, nil
 }
@@ -52,14 +50,6 @@ func (c *Command) Run(args []string) int {
 	host := args[0]
 	containerID := args[1]
 	command := strings.Join(args[2:], " ")
-	log.Printf("Running command: %s", command)
-
-	s := httpshell.NewHTTPShell(host, containerID, command)
-
-	if err := s.RequestShell(); err != nil {
-		c.UI.Error(fmt.Sprintf("RequestShell: %v", err))
-		return 1
-	}
 
 	stdin := c.UI.Reader
 	stdout := c.UI.Writer
@@ -68,8 +58,10 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error("Requires a working terminal")
 		return 1
 	}
-	if err := s.Attach(pty.Fd(), stdin, stdout); err != nil {
-		c.UI.Error(fmt.Sprintf("Detached %v", err))
+
+	err = httpshell.Run(host, containerID, command, pty.Fd(), stdin, stdout)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("Exited: %v", err))
 		return 1
 	}
 	return 0

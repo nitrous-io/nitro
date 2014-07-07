@@ -129,4 +129,18 @@ var _ = Describe("ShellCommand", func() {
 			return ts.finished
 		}).Should(BeTrue())
 	})
+
+	Describe("getLoginCommand", func() {
+		It("returns the logins command", func() {
+			testCases := [][]string{
+				{"", "sudo login -f root"},
+				{"action", "sudo login -f action"},
+			}
+
+			for _, tc := range testCases {
+				cmd := getLoginCommand(tc[0])
+				Expect(cmd).To(Equal(tc[1]), "Incorrect login command")
+			}
+		})
+	})
 })

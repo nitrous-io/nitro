@@ -7,6 +7,7 @@ import (
 
 	"github.com/mitchellh/cli"
 	"github.com/nitrous-io/nitro/command"
+	"github.com/nitrous-io/nitro/pkg/httpshell"
 	flag "github.com/ogier/pflag"
 )
 
@@ -70,7 +71,7 @@ func (c *ShellCommand) Run(args []string) int {
 	host := args[0]
 	container := args[1]
 
-	s := NewHTTPShell(host, container, username)
+	s := httpshell.NewHTTPShell(host, container, username)
 
 	if err := s.RequestShell(); err != nil {
 		c.UI.Error(fmt.Sprintf("RequestShell: %v", err))

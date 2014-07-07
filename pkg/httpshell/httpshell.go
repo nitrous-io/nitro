@@ -30,18 +30,18 @@ type HTTPShell struct {
 	ID          string `json:"id"`
 	host        string
 	containerID string
-	username    string
+	command     string
 }
 
-func NewHTTPShell(host, containerID, username string) *HTTPShell {
-	return &HTTPShell{host: host, containerID: containerID, username: username}
+func NewHTTPShell(host, containerID, command string) *HTTPShell {
+	return &HTTPShell{host: host, containerID: containerID, command: command}
 }
 
 // request a new shell id. This will create a remote shell on the specified
 // container
 func (s *HTTPShell) RequestShell() error {
 	params := url.Values{}
-	params.Set("username", s.username)
+	params.Set("command", s.command)
 	endpoint := fmt.Sprintf("/containers/%s/shells?%s", s.containerID, params.Encode())
 	req, err := http.NewRequest("POST", endpoint, nil)
 	if err != nil {

@@ -24,7 +24,7 @@ open a shell to a box on a Nitrous.IO zone
 
 Options:
 
-  -u, --user=""    %s.
+  -u, --username=""    %s.
 `, usernameUsage)
 
 func init() {
@@ -56,7 +56,7 @@ func (c *ShellCommand) Run(args []string) int {
 	var username string
 	cmdFlags := flag.NewFlagSet("shell", flag.ContinueOnError)
 	cmdFlags.Usage = func() { c.UI.Output(c.Help()) }
-	cmdFlags.StringVarP(&username, "user", "u", "", usernameUsage)
+	cmdFlags.StringVarP(&username, "username", "u", "", usernameUsage)
 
 	err := cmdFlags.Parse(args)
 	if err != nil {
@@ -70,8 +70,9 @@ func (c *ShellCommand) Run(args []string) int {
 	}
 	host := args[0]
 	container := args[1]
+	command := getLoginCommand(username)
 
-	s := httpshell.NewHTTPShell(host, container, username)
+	s := httpshell.NewHTTPShell(host, container, command)
 
 	if err := s.RequestShell(); err != nil {
 		c.UI.Error(fmt.Sprintf("RequestShell: %v", err))
@@ -96,4 +97,11 @@ func (c *ShellCommand) Run(args []string) int {
 		return 1
 	}
 	return 0
+}
+
+func getLoginCommand(username string) string {
+	if username == "" {
+		username = "root"
+	}
+	return fmt.Sprintf("sudo login -f %s", username)
 }

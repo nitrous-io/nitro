@@ -86,6 +86,8 @@ func (s *HTTPShell) Attach(fd uintptr, stdin io.Reader, stdout io.Writer) error 
 		return err
 	}
 	req.Host = s.host
+	// specicial header to signal that we expect a HTTP stream
+	req.Header.Add("X-NITROUS-STREAM", "true")
 
 	c, err := s.getConn()
 	if err != nil {

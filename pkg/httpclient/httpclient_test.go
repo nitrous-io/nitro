@@ -3,12 +3,12 @@ package httpclient_test
 import (
 	"io/ioutil"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
 
 	"github.com/nitrous-io/nitro/pkg/httpclient"
+	"github.com/nitrous-io/nitro/test"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -19,54 +19,10 @@ func Test(t *testing.T) {
 	RunSpecs(t, "httpclient")
 }
 
-type MockServer struct {
-	*httptest.Server
-
-	HandlerFn http.HandlerFunc
-	Called    bool
-}
-
-// a RequestFn makes a request to the MockServer
-type RequestFn func() (*http.Response, error)
-
-func (ms *MockServer) Check(fn RequestFn) {
-	ms.Server = httptest.NewServer(ms.HandlerFn)
-	defer ms.Server.Close()
-	resp, err := fn()
-	Expect(err).To(BeNil())
-	defer resp.Body.Close()
-	Expect(ms.Called).To(BeTrue())
-	return
-}
-
-// an AuthMockServer expects an Authorization header with the given token if token is non-empty.  If token is empty, the Authorization header is expected to be absent
-func AuthMockServer(token string) *MockServer {
-	ms := &MockServer{}
-	ms.HandlerFn = func(w http.ResponseWriter, r *http.Request) {
-		if token == "" {
-			Expect(r.Header.Get("Authorization")).To(BeEmpty())
-		} else {
-			Expect(r.Header.Get("Authorization")).To(Equal("Bearer " + token))
-		}
-		ms.Called = true
-	}
-	return ms
-}
-
-// a MethodMockServer expects the request method to equal the method argument
-func MethodMockServer(method string) *MockServer {
-	ms := &MockServer{}
-	ms.HandlerFn = func(w http.ResponseWriter, r *http.Request) {
-		Expect(r.Method).To(Equal(method))
-		ms.Called = true
-	}
-	return ms
-}
-
 var _ = Describe("httpclient", func() {
 	var (
 		c      *httpclient.Client
-		ms     *MockServer
+		ms     *test.MockServer
 		check  func()
 		token  = "correct_token"
 		params = &url.Values{
@@ -83,45 +39,41 @@ var _ = Describe("httpclient", func() {
 
 	ItHasAuthHeader := func() {
 		It("has auth header", func() {
-			ms = AuthMockServer(token)
+			ms = test.AuthMockServer(token)
 			check()
 		})
 	}
 
 	ItHasNoAuthHeader := func() {
 		It("has no auth header", func() {
-			ms = AuthMockServer("")
+			ms = test.AuthMockServer("")
 			check()
 		})
 	}
 
 	ItUsesHTTPVerb := func(verb string) {
 		It("is a "+verb+" request", func() {
-			ms = MethodMockServer(verb)
+			ms = test.MethodMockServer(verb)
 			check()
 		})
 	}
 
 	ItIncludesQueryString := func() {
 		It("includes query string", func() {
-			ms = &MockServer{}
-			ms.HandlerFn = func(w http.ResponseWriter, r *http.Request) {
+			ms = test.RequestChecker(func(r *http.Request) {
 				Expect(strings.HasSuffix(r.URL.String(), "?containers=arch&containers=ubuntu&say=hello+world%21")).To(BeTrue())
-				ms.Called = true
-			}
+			})
 			check()
 		})
 	}
 
 	ItIncludesFormData := func() {
 		It("includes form data", func() {
-			ms = &MockServer{}
-			ms.HandlerFn = func(w http.ResponseWriter, r *http.Request) {
+			ms = test.RequestChecker(func(r *http.Request) {
 				body, err := ioutil.ReadAll(r.Body)
 				Expect(err).To(BeNil())
 				Expect(body).To(Equal([]byte("containers=arch&containers=ubuntu&say=hello+world%21")))
-				ms.Called = true
-			}
+			})
 			check()
 		})
 	}

@@ -2,6 +2,7 @@ package logs
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -9,7 +10,6 @@ import (
 
 	"github.com/mitchellh/cli"
 	"github.com/nitrous-io/nitro/command"
-	"github.com/nitrous-io/nitro/pkg/stdcopy"
 	flag "github.com/ogier/pflag"
 )
 
@@ -21,12 +21,12 @@ const (
 var usage = fmt.Sprintf(`
 Usage: nitro logs [HOST] [CONTAINER]
 
-  Fetch the logs of the container
+Fetch the logs of the container
 
 Options:
 
-  -f, --follow=""			%s.
-  -t, --timestamps=""		%s.
+  -f, --follow=""         %s.
+  -t, --timestamps=""     %s.
 `, followUsage, timestampsUsage)
 
 type Command struct {
@@ -93,7 +93,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	if _, err := stdcopy.StdCopy(c.UI.Writer, c.UI.ErrorWriter, resp.Body); err != nil {
+	if _, err := io.Copy(c.UI.Writer, resp.Body); err != nil {
 		c.UI.Error(fmt.Sprintf("Unexpected error when fetching logs: %v", err))
 		return 1
 	}

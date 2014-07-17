@@ -10,6 +10,7 @@ import (
 
 	"github.com/mitchellh/cli"
 	"github.com/nitrous-io/nitro/command"
+	"github.com/nitrous-io/nitrous-common/httpclient"
 	flag "github.com/ogier/pflag"
 )
 
@@ -30,20 +31,26 @@ Options:
 `, followUsage, timestampsUsage)
 
 type Command struct {
-	UI *cli.BasicUi
+	UI     *cli.BasicUi
+	client *httpclient.Client
+	server string
 }
 
+// `logs` command requires user to be logged in first via `nitro login`
 func init() {
-	command.Register("logs", NewCommand)
+	command.RegisterAuth("logs", NewCommand)
 }
 
-func NewCommand() (cli.Command, error) {
+// Create a new command that when run will return the logs of a container
+func NewCommand(token string) (cli.Command, error) {
 	return &Command{
 		UI: &cli.BasicUi{
 			Reader:      os.Stdin,
 			Writer:      os.Stdout,
 			ErrorWriter: os.Stderr,
 		},
+		server: command.Env.APIURL,
+		client: httpclient.New(token),
 	}, nil
 }
 

@@ -105,5 +105,5 @@ func (c *Command) Help() string {
 }
 
 func (c *Command) Synopsis() string {
-	return "Login to Nitrous.IO"
+	return "Fetch the logs of a container"
 }

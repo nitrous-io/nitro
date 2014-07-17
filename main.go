@@ -42,10 +42,14 @@ func main() {
 
 	exitCode, err := cli.Run()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "nitro: unexpected error: %v\n", err)
+		switch err {
+		case command.ErrMissingAuthToken:
+			fmt.Fprintf(os.Stderr, "nitro: requires a logged in user. Maybe you want nitro login first\n")
+		default:
+			fmt.Fprintf(os.Stderr, "nitro: unexpected error: %v\n", err)
+		}
 		os.Exit(1)
 	}
-
 	os.Exit(exitCode)
 }
 

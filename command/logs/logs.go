@@ -1,6 +1,7 @@
 package logs
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,9 +21,9 @@ const (
 )
 
 var usage = fmt.Sprintf(`
-Usage: nitro logs [HOST] [CONTAINER]
+Usage: nitro logs [SLUG]
 
-Fetch the logs of the container
+Fetch the logs of the container with specified slug.
 
 Options:
 
@@ -63,19 +64,23 @@ func (c *Command) Run(args []string) int {
 	cmdFlags.BoolVarP(&follow, "follow", "f", false, followUsage)
 	cmdFlags.BoolVarP(&timestamps, "timestamps", "t", false, timestampsUsage)
 
-	err := cmdFlags.Parse(args)
-	if err != nil {
+	if err := cmdFlags.Parse(args); err != nil {
 		return 1
 	}
 
 	args = cmdFlags.Args()
-	if len(args) != 2 {
+	if len(args) != 1 {
 		c.UI.Error(c.Help())
 		return 1
 	}
 
-	host := args[0]
-	containerID := args[1]
+	slug := args[0]
+
+	cr, err := c.getContainerResp(slug)
+	if err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
 
 	params := url.Values{}
 	if follow {
@@ -85,18 +90,22 @@ func (c *Command) Run(args []string) int {
 		params.Set("timestamps", "1")
 	}
 
-	endpoint := fmt.Sprintf("%s/containers/%s/logs?%s", host, containerID, params.Encode())
-	resp, err := http.Get(endpoint)
+	logsEndpoint := fmt.Sprintf("/containers/%s/logs?%s", cr.Container.CID, params.Encode())
+	req, err := http.NewRequest("GET", logsEndpoint, nil)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Failed to fetch container %s logs on host %s, err : %v",
-			containerID, host, err))
+		c.UI.Error(err.Error())
+		return 1
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("Failed to fetch container %s logs, err : %v", slug, err))
 		return 1
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		c.UI.Error(fmt.Sprintf("Failed to fetch container %s logs on host %s, status : %d",
-			containerID, host, resp.StatusCode))
+		c.UI.Error(fmt.Sprintf("Failed to fetch container %s logs, status : %d", slug, resp.StatusCode))
 		return 1
 	}
 
@@ -113,4 +122,35 @@ func (c *Command) Help() string {
 
 func (c *Command) Synopsis() string {
 	return "Fetch the logs of a container"
+}
+
+type containerResp struct {
+	Container struct {
+		CID   string `json:"cid"`
+		Slug  string `json:"slug"`
+		Image string `json:"image"`
+		State string `json:"state"`
+	} `json:"container"`
+
+	Host struct {
+		Slug           string `json:"slug"`
+		IpAddress      string `json:"ip_address"`
+		FreighterdPort int    `json:"freighterd_port"`
+	} `json:"host"`
+}
+
+func (c *Command) getContainerResp(slug string) (*containerResp, error) {
+	// get container data
+	endpoint := fmt.Sprintf("%s/api/v0/containers/%s", c.server, slug)
+	resp, err := c.client.GetAuthed(endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	cr := &containerResp{}
+	if err := json.NewDecoder(resp.Body).Decode(cr); err != nil {
+		return nil, err
+	}
+	return cr, nil
 }

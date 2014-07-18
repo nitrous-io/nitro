@@ -10,6 +10,7 @@ import (
 	flag "github.com/ogier/pflag"
 
 	. "github.com/nitrous-io/nitro/command/containers"
+	"github.com/nitrous-io/nitro/command/login"
 )
 
 const forceUsage = "Skip confirmation"
@@ -43,6 +44,14 @@ func NewCommand() (cli.Command, error) {
 }
 
 func (c *Command) Run(args []string) int {
+	if command.Env.AuthToken == "" {
+		err := login.PromptLogin()
+		if err != nil {
+			return 1
+		}
+		c.Client = httpclient.New(command.Env.AuthToken)
+	}
+
 	var force bool
 
 	cmdFlags := flag.NewFlagSet("restart", flag.ContinueOnError)

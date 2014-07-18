@@ -10,6 +10,7 @@ import (
 	"github.com/nitrous-io/nitrous-common/httpclient"
 
 	. "github.com/nitrous-io/nitro/command/containers"
+	"github.com/nitrous-io/nitro/command/login"
 )
 
 const usage = `
@@ -37,6 +38,14 @@ func NewCommand() (cli.Command, error) {
 }
 
 func (c *Command) Run(args []string) int {
+	if command.Env.AuthToken == "" {
+		err := login.PromptLogin()
+		if err != nil {
+			return 1
+		}
+		c.Client = httpclient.New(command.Env.AuthToken)
+	}
+
 	cmdFlags := flag.NewFlagSet("start", flag.ContinueOnError)
 	cmdFlags.Usage = func() { c.UI.Output(c.Help()) }
 

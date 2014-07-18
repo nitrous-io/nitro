@@ -12,6 +12,8 @@ var (
 	Env      *Environment
 )
 
+const ErrorNotLoggedIn = "Auth token is not provided"
+
 func init() {
 	Commands = map[string]cli.CommandFactory{}
 	Env = ConfigureEnvironment()

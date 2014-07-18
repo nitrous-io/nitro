@@ -8,6 +8,7 @@ import (
 
 	"github.com/mitchellh/cli"
 	"github.com/nitrous-io/nitro/command"
+	"github.com/nitrous-io/nitro/command/login"
 	"github.com/nitrous-io/nitro/pkg/randomnamegenerator"
 	"github.com/nitrous-io/nitrous-common/httpclient"
 	flag "github.com/ogier/pflag"
@@ -53,6 +54,14 @@ func (c *Command) Help() string {
 }
 
 func (c *Command) Run(args []string) int {
+	if command.Env.AuthToken == "" {
+		err := login.PromptLogin()
+		if err != nil {
+			return 1
+		}
+		c.Client = httpclient.New(command.Env.AuthToken)
+	}
+
 	var (
 		region string
 		slug   string

@@ -1,6 +1,7 @@
 package login
 
 import (
+	"errors"
 	"fmt"
 
 	"strings"
@@ -62,6 +63,10 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	if username == "" && password == "" {
+		c.UI.Info("Login to Nitrous.IO:")
+	}
+
 	if username == "" {
 		username, err = c.UI.Ask("Username:")
 		if err != nil {
@@ -100,4 +105,19 @@ func (c *Command) Run(args []string) int {
 
 func (c *Command) Synopsis() string {
 	return "Login to Nitrous.IO"
+}
+
+func PromptLogin() error {
+	c, err := NewCommand()
+	if err != nil {
+		return err
+	}
+
+	s := c.Run([]string{})
+	if s == 0 {
+		// reload config
+		command.Env = command.ConfigureEnvironment()
+		return nil
+	}
+	return errors.New("Login failed")
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/nitrous-io/nitrous-common/httpclient"
 
 	. "github.com/nitrous-io/nitro/command/containers"
+	"github.com/nitrous-io/nitro/command/login"
 )
 
 const (
@@ -64,6 +65,14 @@ func (c *Command) Help() string {
 }
 
 func (c *Command) Run(args []string) int {
+	if command.Env.AuthToken == "" {
+		err := login.PromptLogin()
+		if err != nil {
+			return 1
+		}
+		c.Client = httpclient.New(command.Env.AuthToken)
+	}
+
 	params := &containerParams{}
 
 	cmdFlags := flag.NewFlagSet("create", flag.ContinueOnError)

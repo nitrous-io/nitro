@@ -1,6 +1,7 @@
 package logs
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -90,14 +91,10 @@ func (c *Command) Run(args []string) int {
 		params.Set("timestamps", "1")
 	}
 
-	logsEndpoint := fmt.Sprintf("/containers/%s/logs?%s", cr.Container.CID, params.Encode())
-	req, err := http.NewRequest("GET", logsEndpoint, nil)
-	if err != nil {
-		c.UI.Error(err.Error())
-		return 1
-	}
-
-	resp, err := http.DefaultClient.Do(req)
+	logsEndpoint := fmt.Sprintf("http://%s:%d/containers/%s/logs?%s",
+		cr.Host.IpAddress.String, cr.Host.FreighterdPort.Int64,
+		cr.Container.CID, params.Encode())
+	resp, err := http.Get(logsEndpoint)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Failed to fetch container %s logs, err : %v", slug, err))
 		return 1
@@ -133,9 +130,9 @@ type containerResp struct {
 	} `json:"container"`
 
 	Host struct {
-		Slug           string `json:"slug"`
-		IpAddress      string `json:"ip_address"`
-		FreighterdPort int    `json:"freighterd_port"`
+		Slug           string
+		IpAddress      sql.NullString
+		FreighterdPort sql.NullInt64
 	} `json:"host"`
 }
 

@@ -58,6 +58,8 @@ var _ = Describe("containers/destroy", func() {
 
 		configPath, err = test.WriteConfig(&command.ConfigFile{}, "")
 		Expect(err).To(BeNil())
+
+		command.Env.AuthToken = "a_token"
 	})
 
 	AfterEach(func() {

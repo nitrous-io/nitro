@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/mitchellh/cli"
+	"github.com/nitrous-io/nitro/command"
 	"github.com/nitrous-io/nitro/command/hosts/list"
 	"github.com/nitrous-io/nitrous-common/httpclient"
 
@@ -28,6 +29,8 @@ var _ = Describe("hosts/list", func() {
 	)
 
 	BeforeEach(func() {
+		command.Env.AuthToken = "a_token"
+
 		srv = ghttp.NewServer()
 		ui = &cli.MockUi{}
 		cmd = &list.Command{
@@ -41,6 +44,8 @@ var _ = Describe("hosts/list", func() {
 			}),
 			ghttp.VerifyRequest("GET", "/api/v0/hosts"),
 		}
+
+		command.Env.AuthToken = "a_token"
 	})
 
 	AfterEach(func() {

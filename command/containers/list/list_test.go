@@ -54,6 +54,8 @@ var _ = Describe("containers/list", func() {
 		}
 		configPath, err = test.WriteConfig(&command.ConfigFile{}, "")
 		Expect(err).To(BeNil())
+
+		command.Env.AuthToken = "a_token"
 	})
 
 	AfterEach(func() {
@@ -76,6 +78,7 @@ var _ = Describe("containers/list", func() {
 					DefaultHost: "host-1",
 				}, configPath)
 				Expect(err).To(BeNil())
+				command.Env.AuthToken = "a_token"
 			})
 
 			It("uses the default host", func() {

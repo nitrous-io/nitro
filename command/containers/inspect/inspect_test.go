@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/mitchellh/cli"
+	"github.com/nitrous-io/nitro/command"
 	"github.com/nitrous-io/nitro/command/containers/inspect"
 	"github.com/nitrous-io/nitrous-common/httpclient"
 
@@ -46,6 +47,8 @@ var _ = Describe("containers/inspect", func() {
 			Server: srv.URL(),
 			Client: httpclient.New("correct_token"),
 		}
+
+		command.Env.AuthToken = "a_token"
 	})
 
 	AfterEach(func() {

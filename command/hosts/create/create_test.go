@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/mitchellh/cli"
+	"github.com/nitrous-io/nitro/command"
 	"github.com/nitrous-io/nitro/command/hosts/create"
 	"github.com/nitrous-io/nitrous-common/httpclient"
 
@@ -40,6 +41,8 @@ var _ = Describe("hosts/create", func() {
 			}),
 			ghttp.VerifyRequest("POST", "/api/v0/hosts"),
 		}
+
+		command.Env.AuthToken = "a_token"
 	})
 
 	It("requires size as an argument", func() {

@@ -51,6 +51,7 @@ var _ = Describe("containers/restart", func() {
 			Server: srv.URL(),
 			Client: httpclient.New("correct_token"),
 		}
+		command.Env.AuthToken = "a_token"
 	})
 
 	AfterEach(func() {

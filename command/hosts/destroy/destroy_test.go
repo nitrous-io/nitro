@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/mitchellh/cli"
+	"github.com/nitrous-io/nitro/command"
 	"github.com/nitrous-io/nitro/command/hosts/destroy"
 	"github.com/nitrous-io/nitrous-common/httpclient"
 
@@ -27,6 +28,8 @@ var _ = Describe("hosts/destroy", func() {
 	)
 
 	BeforeEach(func() {
+		command.Env.AuthToken = "a_token"
+
 		srv = ghttp.NewServer()
 		ui = &cli.MockUi{}
 		cmd = &destroy.Command{
@@ -40,6 +43,8 @@ var _ = Describe("hosts/destroy", func() {
 			}),
 			ghttp.VerifyRequest("DELETE", "/api/v0/hosts/foo"),
 		}
+
+		command.Env.AuthToken = "a_token"
 	})
 
 	It("requires name as an argument", func() {

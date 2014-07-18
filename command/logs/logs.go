@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/mitchellh/cli"
@@ -19,6 +20,7 @@ import (
 const (
 	followUsage     = "Follow log output"
 	timestampsUsage = "Show timestamps"
+	tailUsage       = "Output specified number of lines at the end of logs: `all` or `<number>`. Default all"
 )
 
 var usage = fmt.Sprintf(`
@@ -30,7 +32,8 @@ Options:
 
   -f, --follow=""         %s.
   -t, --timestamps=""     %s.
-`, followUsage, timestampsUsage)
+  -T, --tail=""           %s.
+`, followUsage, timestampsUsage, tailUsage)
 
 type Command struct {
 	UI     *cli.BasicUi
@@ -59,11 +62,13 @@ func NewCommand(token string) (cli.Command, error) {
 func (c *Command) Run(args []string) int {
 	var follow bool
 	var timestamps bool
+	var tail string
 
 	cmdFlags := flag.NewFlagSet("logs", flag.ContinueOnError)
 	cmdFlags.Usage = func() { c.UI.Output(c.Help()) }
 	cmdFlags.BoolVarP(&follow, "follow", "f", false, followUsage)
 	cmdFlags.BoolVarP(&timestamps, "timestamps", "t", false, timestampsUsage)
+	cmdFlags.StringVarP(&tail, "tail", "T", "all", tailUsage)
 
 	if err := cmdFlags.Parse(args); err != nil {
 		return 1
@@ -84,12 +89,9 @@ func (c *Command) Run(args []string) int {
 	}
 
 	params := url.Values{}
-	if follow {
-		params.Set("follow", "1")
-	}
-	if timestamps {
-		params.Set("timestamps", "1")
-	}
+	params.Set("follow", strconv.FormatBool(follow))
+	params.Set("timestamps", strconv.FormatBool(timestamps))
+	params.Set("tail", tail)
 
 	logsEndpoint := fmt.Sprintf("http://%s:%d/containers/%s/logs?%s",
 		cr.Host.IpAddress.String, cr.Host.FreighterdPort.Int64,

@@ -4,14 +4,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"net/url"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/mitchellh/cli"
+	"github.com/nitrous-io/freighter/freighterclient"
 	"github.com/nitrous-io/nitro/command"
 	"github.com/nitrous-io/nitrous-common/httpclient"
 	flag "github.com/ogier/pflag"
@@ -88,28 +86,17 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	params := url.Values{}
-	params.Set("follow", strconv.FormatBool(follow))
-	params.Set("timestamps", strconv.FormatBool(timestamps))
-	params.Set("tail", tail)
+	host := &freighterclient.Host{
+		Host:   cr.Host.IpAddress.String,
+		Port:   int(cr.Host.FreighterdPort.Int64),
+		Secure: false,
+	}
+	client := freighterclient.NewClient(nil)
 
-	logsEndpoint := fmt.Sprintf("http://%s:%d/containers/%s/logs?%s",
-		cr.Host.IpAddress.String, cr.Host.FreighterdPort.Int64,
-		cr.Container.CID, params.Encode())
-	resp, err := http.Get(logsEndpoint)
+	err = client.Logs(host, cr.Container.CID, strconv.FormatBool(follow),
+		strconv.FormatBool(timestamps), tail, c.UI.Writer)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Failed to fetch container %s logs, err : %v", slug, err))
-		return 1
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		c.UI.Error(fmt.Sprintf("Failed to fetch container %s logs, status : %d", slug, resp.StatusCode))
-		return 1
-	}
-
-	if _, err := io.Copy(c.UI.Writer, resp.Body); err != nil {
-		c.UI.Error(fmt.Sprintf("Unexpected error when fetching logs: %v", err))
+		c.UI.Error(err.Error())
 		return 1
 	}
 	return 0

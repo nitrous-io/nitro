@@ -6,3 +6,4 @@ github.com/onsi/ginkgo/ginkgo #12446bbcc74950944c897e32ea99cc8d058f9c92
 github.com/onsi/gomega #036273e6f643552b16fe7a6464afd2ae0324992e
 
 github.com/nitrous-io/nitrous-common !git@github.com:nitrous-io/nitrous-common
+github.com/nitrous-io/freighter/freighterclient #f55c6a6f5db6e48adbc447c2b01f4cbd6cd55d7f !git@github.com:nitrous-io/freighter

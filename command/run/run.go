@@ -1,8 +1,6 @@
 package run
 
 import (
-	"database/sql"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -11,6 +9,7 @@ import (
 	"github.com/mitchellh/cli"
 	"github.com/nitrous-io/nitro/command"
 	"github.com/nitrous-io/nitro/pkg/httpshell"
+	"github.com/nitrous-io/nitro/pkg/nitrousapi"
 	"github.com/nitrous-io/nitrous-common/httpclient"
 )
 
@@ -56,13 +55,13 @@ func (c *Command) Run(args []string) int {
 	}
 
 	slug := args[0]
-	cr, err := c.getContainerResp(slug)
+	cr, err := nitrousapi.GetContainer(c.client, c.server, slug)
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1
 	}
 
-	host := fmt.Sprintf("%s:%d", cr.Host.IpAddress.String, cr.Host.FreighterdPort.Int64)
+	host := fmt.Sprintf("%s:%d", cr.Host.IPAddress, cr.Host.FreighterdPort)
 	command := strings.Join(args[1:], " ")
 
 	stdin := c.UI.Reader
@@ -73,7 +72,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	err = httpshell.Run(host, cr.Container.CID, command, pty.Fd(), stdin, stdout)
+	err = httpshell.Run(host, cr.CID, command, pty.Fd(), stdin, stdout)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Exited: %v", err))
 		return 1
@@ -87,35 +86,4 @@ func (c *Command) Help() string {
 
 func (c *Command) Synopsis() string {
 	return "Run a command on a remote box"
-}
-
-type containerResp struct {
-	Container struct {
-		CID   string `json:"cid"`
-		Slug  string `json:"slug"`
-		Image string `json:"image"`
-		State string `json:"state"`
-	} `json:"container"`
-
-	Host struct {
-		Slug           string
-		IpAddress      sql.NullString
-		FreighterdPort sql.NullInt64
-	} `json:"host"`
-}
-
-func (c *Command) getContainerResp(slug string) (*containerResp, error) {
-	// get container data
-	endpoint := fmt.Sprintf("%s/api/v0/containers/%s", c.server, slug)
-	resp, err := c.client.GetAuthed(endpoint, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	cr := &containerResp{}
-	if err := json.NewDecoder(resp.Body).Decode(cr); err != nil {
-		return nil, err
-	}
-	return cr, nil
 }

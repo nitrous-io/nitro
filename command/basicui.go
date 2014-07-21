@@ -33,9 +33,9 @@ func (u *BasicUI) Confirm(query string) Confirmation {
 		return ConfirmErr
 	}
 
-	if strings.ToLower(answer) != "y" {
-		return ConfirmNo
+	if strings.ToLower(answer) == "y" {
+		return ConfirmYes
 	}
 
-	return ConfirmYes
+	return ConfirmNo
 }

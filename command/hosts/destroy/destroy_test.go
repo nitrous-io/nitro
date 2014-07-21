@@ -1,6 +1,7 @@
 package destroy_test
 
 import (
+	"io"
 	"net/http"
 	"os"
 	"testing"
@@ -24,7 +25,9 @@ func Test(t *testing.T) {
 var _ = Describe("hosts/destroy", func() {
 	var (
 		cmd          *destroy.Command
-		ui           *cli.MockUi
+		ui           *command.MockUI
+		r            *io.PipeReader
+		w            *io.PipeWriter
 		srv          *ghttp.Server
 		handlers     http.HandlerFunc
 		statusCode   int
@@ -32,11 +35,12 @@ var _ = Describe("hosts/destroy", func() {
 	)
 
 	BeforeEach(func() {
-		ui = &cli.MockUi{}
+		r, w = io.Pipe()
+		ui = &command.MockUI{&cli.MockUi{InputReader: r}}
 
 		handlers = ghttp.CombineHandlers(
 			ghttp.VerifyHeaderKV("Authorization", "Bearer a_token"),
-			ghttp.VerifyRequest("DELETE", "/api/v0/hosts/foo"),
+			ghttp.VerifyRequest("DELETE", "/api/v0/hosts/rocky-host-12"),
 			ghttp.RespondWithPtr(&statusCode, &responseBody),
 		)
 		srv = ghttp.NewServer()
@@ -50,6 +54,8 @@ var _ = Describe("hosts/destroy", func() {
 	})
 
 	AfterEach(func() {
+		r.Close()
+		w.Close()
 		srv.Close()
 	})
 
@@ -60,24 +66,28 @@ var _ = Describe("hosts/destroy", func() {
 	})
 
 	Context("when host is successfully destroyed", func() {
+		doCmd := func() int {
+			return cmd.Run([]string{"rocky-host-12", "--force"})
+		}
+
 		BeforeEach(func() {
 			statusCode = http.StatusOK
 			responseBody = `{"status":"ok"}`
 		})
 
 		It("reports success", func() {
-			code := cmd.Run([]string{"foo"})
+			code := doCmd()
 			Expect(ui.OutputWriter.String()).To(ContainSubstring("Done"))
 			Expect(code).To(Equal(0))
 		})
 
 		Context("when host is the default host in the config file", func() {
 			It("unsets default host in config file", func() {
-				configPath, err := test.WriteConfig(&command.ConfigFile{DefaultHost: "foo"}, "")
+				configPath, err := test.WriteConfig(&command.ConfigFile{DefaultHost: "rocky-host-12"}, "")
 				Expect(err).To(BeNil())
 				defer os.Remove(configPath)
 
-				cmd.Run([]string{"foo"})
+				doCmd()
 
 				c, err := command.LoadConfig()
 				Expect(err).To(BeNil())
@@ -91,7 +101,7 @@ var _ = Describe("hosts/destroy", func() {
 				Expect(err).To(BeNil())
 				defer os.Remove(configPath)
 
-				cmd.Run([]string{"foo"})
+				doCmd()
 
 				c, err := command.LoadConfig()
 				Expect(err).To(BeNil())
@@ -101,15 +111,42 @@ var _ = Describe("hosts/destroy", func() {
 	})
 
 	Context("when host cannot be destroyed", func() {
+		doCmd := func() int {
+			return cmd.Run([]string{"rocky-host-12", "--force"})
+		}
+
 		BeforeEach(func() {
 			statusCode = http.StatusBadRequest
 			responseBody = `{"error":"invalid_request","error_description":"host not found"}`
 		})
 
 		It("displays error message", func() {
-			code := cmd.Run([]string{"foo"})
+			code := doCmd()
 			Expect(ui.ErrorWriter.String()).To(ContainSubstring("host not found"))
 			Expect(code).To(Equal(1))
+		})
+	})
+
+	Context("attempting without the --force option", func() {
+		doCmd := func() int {
+			return cmd.Run([]string{"rocky-host-12"})
+		}
+
+		It("asks for confirmation and user cancels", func() {
+			go w.Write([]byte("n\n"))
+			code := doCmd()
+			Expect(ui.OutputWriter.String()).To(ContainSubstring("Cancelled"))
+			Expect(code).To(Equal(1))
+		})
+
+		It("asks for confirmation and user confirms", func() {
+			statusCode = http.StatusOK
+			responseBody = `{"status":"ok"}`
+
+			go w.Write([]byte("y\n"))
+			code := doCmd()
+			Expect(ui.OutputWriter.String()).To(ContainSubstring("rocky-host-12"))
+			Expect(code).To(Equal(0))
 		})
 	})
 })

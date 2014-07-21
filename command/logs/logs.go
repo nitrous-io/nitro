@@ -1,8 +1,6 @@
 package logs
 
 import (
-	"database/sql"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -11,6 +9,7 @@ import (
 	"github.com/mitchellh/cli"
 	"github.com/nitrous-io/freighter/freighterclient"
 	"github.com/nitrous-io/nitro/command"
+	"github.com/nitrous-io/nitro/pkg/nitrousapi"
 	"github.com/nitrous-io/nitrous-common/httpclient"
 	flag "github.com/ogier/pflag"
 )
@@ -79,21 +78,20 @@ func (c *Command) Run(args []string) int {
 	}
 
 	slug := args[0]
-
-	cr, err := c.getContainerResp(slug)
+	cr, err := nitrousapi.GetContainer(c.client, c.server, slug)
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1
 	}
 
 	host := &freighterclient.Host{
-		Host:   cr.Host.IpAddress.String,
-		Port:   int(cr.Host.FreighterdPort.Int64),
+		Host:   cr.Host.IPAddress,
+		Port:   int(cr.Host.FreighterdPort),
 		Secure: false,
 	}
 	client := freighterclient.NewClient(nil)
 
-	err = client.Logs(host, cr.Container.CID, strconv.FormatBool(follow),
+	err = client.Logs(host, cr.CID, strconv.FormatBool(follow),
 		strconv.FormatBool(timestamps), tail, c.UI.Writer)
 	if err != nil {
 		c.UI.Error(err.Error())
@@ -108,35 +106,4 @@ func (c *Command) Help() string {
 
 func (c *Command) Synopsis() string {
 	return "Fetch the logs of a container"
-}
-
-type containerResp struct {
-	Container struct {
-		CID   string `json:"cid"`
-		Slug  string `json:"slug"`
-		Image string `json:"image"`
-		State string `json:"state"`
-	} `json:"container"`
-
-	Host struct {
-		Slug           string
-		IpAddress      sql.NullString
-		FreighterdPort sql.NullInt64
-	} `json:"host"`
-}
-
-func (c *Command) getContainerResp(slug string) (*containerResp, error) {
-	// get container data
-	endpoint := fmt.Sprintf("%s/api/v0/containers/%s", c.server, slug)
-	resp, err := c.client.GetAuthed(endpoint, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	cr := &containerResp{}
-	if err := json.NewDecoder(resp.Body).Decode(cr); err != nil {
-		return nil, err
-	}
-	return cr, nil
 }

@@ -89,8 +89,9 @@ func (c *Command) Synopsis() string {
 }
 
 func (c *Command) makeRequest(host, image, newName string, force bool) error {
-	path := fmt.Sprintf("%s/api/v0/hosts/%s/images/%s/tag", c.Server, host, image)
+	path := fmt.Sprintf("%s/api/v0/hosts/%s/images/tag", c.Server, host)
 	params := &url.Values{}
+	params.Set("image", image)
 	params.Set("tag", newName)
 	if force {
 		params.Set("force", "true")

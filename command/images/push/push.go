@@ -75,8 +75,10 @@ func (c *Command) Synopsis() string {
 }
 
 func (c *Command) makeRequest(host, image, dest string) error {
-	path := fmt.Sprintf("%s/api/v0/hosts/%s/images/%s/push", c.Server, host, image)
-	params := &url.Values{"destination": []string{dest}}
+	path := fmt.Sprintf("%s/api/v0/hosts/%s/images/push", c.Server, host)
+	params := &url.Values{}
+	params.Set("image", image)
+	params.Set("destination", dest)
 	resp, err := c.Client.PostFormAuthed(path, params)
 	if err != nil {
 		return err

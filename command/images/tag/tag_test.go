@@ -24,20 +24,23 @@ var _ = Describe("images/tag", func() {
 		cmd          *tag.Command
 		ui           *command.MockUI
 		srv          *ghttp.Server
-		handlers     http.HandlerFunc
 		statusCode   int
 		responseBody string
 	)
 
 	BeforeEach(func() {
 		ui = &command.MockUI{&cli.MockUi{}}
-		handlers = ghttp.CombineHandlers(
-			ghttp.VerifyHeaderKV("Authorization", "Bearer correct_token"),
-			ghttp.VerifyRequest("POST", "/api/v0/hosts/myhost/images/scratch/tag"),
-			ghttp.RespondWithPtr(&statusCode, &responseBody),
-		)
 		srv = ghttp.NewServer()
-		srv.AppendHandlers(handlers)
+		srv.AppendHandlers(ghttp.CombineHandlers(
+			func(w http.ResponseWriter, req *http.Request) {
+				err := req.ParseForm()
+				Expect(err).To(BeNil())
+				Expect(req.PostFormValue("image")).To(Equal("scratch"))
+			},
+			ghttp.VerifyHeaderKV("Authorization", "Bearer correct_token"),
+			ghttp.VerifyRequest("POST", "/api/v0/hosts/myhost/images/tag"),
+			ghttp.RespondWithPtr(&statusCode, &responseBody),
+		))
 
 		cmd = &tag.Command{
 			UI:     ui,

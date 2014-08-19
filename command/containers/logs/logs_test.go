@@ -68,7 +68,7 @@ var _ = Describe("logs", func() {
 			ghttp.VerifyRequest("GET", "/containers/42/logs"),
 			ghttp.RespondWithPtr(&fStatusCode, &fResponseBody),
 		)
-		fsrv = ghttp.NewServer()
+		fsrv = ghttp.NewTLSServer()
 		fsrv.AppendHandlers(fhandlers)
 
 		stdout = bytes.NewBuffer(nil)
@@ -109,6 +109,7 @@ var _ = Describe("logs", func() {
 					"ip_address":      host,
 					"freighterd_port": portInt,
 					"domain":          "example.com",
+					"ca":              localhostCert,
 				},
 			}
 
@@ -130,3 +131,23 @@ var _ = Describe("logs", func() {
 		})
 	})
 })
+
+// These certs are the same as the certs embeded with net/http/httptest.
+// If there's mismatched certs error, look at net/http/httptest/server.go to
+// check if the cert has changed.
+//
+// localhostCert is a PEM-encoded TLS cert with SAN IPs
+// "127.0.0.1" and "[::1]", expiring at the last second of 2049 (the end
+// of ASN.1 time).
+// generated from src/pkg/crypto/tls:
+// go run generate_cert.go  --rsa-bits 512 --host 127.0.0.1,::1,example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
+var localhostCert = `-----BEGIN CERTIFICATE-----
+MIIBdzCCASOgAwIBAgIBADALBgkqhkiG9w0BAQUwEjEQMA4GA1UEChMHQWNtZSBD
+bzAeFw03MDAxMDEwMDAwMDBaFw00OTEyMzEyMzU5NTlaMBIxEDAOBgNVBAoTB0Fj
+bWUgQ28wWjALBgkqhkiG9w0BAQEDSwAwSAJBAN55NcYKZeInyTuhcCwFMhDHCmwa
+IUSdtXdcbItRB/yfXGBhiex00IaLXQnSU+QZPRZWYqeTEbFSgihqi1PUDy8CAwEA
+AaNoMGYwDgYDVR0PAQH/BAQDAgCkMBMGA1UdJQQMMAoGCCsGAQUFBwMBMA8GA1Ud
+EwEB/wQFMAMBAf8wLgYDVR0RBCcwJYILZXhhbXBsZS5jb22HBH8AAAGHEAAAAAAA
+AAAAAAAAAAAAAAEwCwYJKoZIhvcNAQEFA0EAAoQn/ytgqpiLcZu9XKbCJsJcvkgk
+Se6AbGXgSlq+ZCEVo0qIwSgeBqmsJxUu7NCSOwVJLYNEBO2DtIxoYVk+MA==
+-----END CERTIFICATE-----`

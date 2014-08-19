@@ -91,8 +91,13 @@ func (c *Command) Run(args []string) int {
 		cr.Host.IPAddress,
 		int(cr.Host.FreighterdPort),
 		cr.Host.Domain,
+		[]byte(cr.Host.CA),
 	)
-	client := freighterclient.NewClient(host)
+	client, err := freighterclient.NewClient(host)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("failed to create connection to the host %s ", err))
+		return 1
+	}
 
 	err = client.Logs(cr.CID, strconv.FormatBool(follow),
 		strconv.FormatBool(timestamps), tail, c.UI.Writer)

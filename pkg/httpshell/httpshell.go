@@ -2,10 +2,10 @@ package httpshell
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -31,15 +31,17 @@ type HTTPShell struct {
 	host        string
 	containerID string
 	command     string
+	tlsConfig   *tls.Config
 }
 
 // NewHTTPShell creates a shell that uses HTTP hijacking to represent the
 // input/output stream. The stream is encrypted with HTTPS.
-func NewHTTPShell(host, containerID, command string) (*HTTPShell, error) {
+func NewHTTPShell(host, containerID, command string, tlsConfig *tls.Config) (*HTTPShell, error) {
 	return &HTTPShell{
 		host:        host,
 		containerID: containerID,
 		command:     command,
+		tlsConfig:   tlsConfig,
 	}, nil
 }
 
@@ -173,7 +175,7 @@ func (s *HTTPShell) resize(fd uintptr) error {
 // get a client connection to the remote server. The connection need to
 // implements Hijacker
 func (s *HTTPShell) getConn() (*httputil.ClientConn, error) {
-	dial, err := net.Dial("tcp", s.host)
+	dial, err := tls.Dial("tcp", s.host, s.tlsConfig)
 	if err != nil {
 		return nil, fmt.Errorf("Can't connect to %s", s.host)
 	}

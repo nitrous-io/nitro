@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 
 	flag "github.com/ogier/pflag"
 
@@ -17,27 +16,7 @@ import (
 	. "github.com/nitrous-io/nitro/command/containers"
 )
 
-const (
-	slugUsage         = "A unique slug for the container"
-	imageUsage        = "Specify an image to use to create the container"
-	envUsage          = "Set environment variables for the container in the format <key>:<value>. " + command.MultiargUsage
-	volumesUsage      = "Add data volume so other containers can mount given <path>. " + command.MultiargUsage
-	portForwardsUsage = "Forward ports from container to host.  Use one of: 'ip:hostPort:containerPort', 'ip::containerPort', or 'hostPort:containerPort' specifications. " + command.MultiargUsage
-)
-
-const usage = `
-Usage: nitro create <host> [options]
-
-  create a new container
-
-Options:
-
-  -s, --slug=""           %s
-  -i, --image=""          %s
-  -e, --env=[]            %s
-  -v, --volume=[]         %s
-  -p, --port-forward=[]   %s
-`
+var usage = command.ContainerCreateUsage
 
 type Command struct {
 	UI     cli.Ui
@@ -67,9 +46,7 @@ func NewCommand(token string) (cli.Command, error) {
 }
 
 func (c *Command) Help() string {
-	// TODO this is getting unwieldy, maybe text/template
-	return strings.TrimSpace(fmt.Sprintf(usage, slugUsage,
-		imageUsage, envUsage, volumesUsage, portForwardsUsage))
+	return usage.String()
 }
 
 func (c *Command) Run(args []string) int {
@@ -77,12 +54,12 @@ func (c *Command) Run(args []string) int {
 
 	cmdFlags := flag.NewFlagSet("create", flag.ContinueOnError)
 	cmdFlags.Usage = func() { c.UI.Output(c.Help()) }
-	cmdFlags.StringVarP(&params.slug, "slug", "s", "", slugUsage)
-	cmdFlags.StringVarP(&params.image, "image", "i", "", imageUsage)
+	cmdFlags.StringVarP(&params.slug, "slug", "s", "", usage.OptUsage("slug"))
+	cmdFlags.StringVarP(&params.image, "image", "i", "", usage.OptUsage("image"))
 
-	cmdFlags.VarP(&params.envVars, "env", "e", envUsage)
-	cmdFlags.VarP(&params.volumes, "volume", "v", volumesUsage)
-	cmdFlags.VarP(&params.portForwards, "port-forward", "p", portForwardsUsage)
+	cmdFlags.VarP(&params.envVars, "env", "e", usage.OptUsage("env"))
+	cmdFlags.VarP(&params.volumes, "volume", "v", usage.OptUsage("volume"))
+	cmdFlags.VarP(&params.portForwards, "port-forward", "p", usage.OptUsage("port-forward"))
 
 	err := cmdFlags.Parse(args)
 	if err != nil {
@@ -119,7 +96,7 @@ func (c *Command) Run(args []string) int {
 }
 
 func (c *Command) Synopsis() string {
-	return "Create a new container"
+	return usage.Synopsis
 }
 
 func (c *Command) createContainer(cp *containerParams) (*Container, error) {

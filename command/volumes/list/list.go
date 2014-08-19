@@ -17,11 +17,7 @@ import (
 	"github.com/nitrous-io/nitrous-common/httpclient"
 )
 
-const usage = `
-Usage: nitro volumes <host>
-
-  list data volumes on host
-`
+var usage = command.VolumesListUsage
 
 type Command struct {
 	UI     cli.Ui
@@ -46,7 +42,7 @@ func NewCommand(token string) (cli.Command, error) {
 }
 
 func (c *Command) Help() string {
-	return strings.TrimSpace(usage)
+	return usage.String()
 }
 
 func (c *Command) Run(args []string) int {
@@ -82,7 +78,7 @@ func (c *Command) Run(args []string) int {
 }
 
 func (c *Command) Synopsis() string {
-	return "List volumes"
+	return usage.Synopsis
 }
 
 func (c *Command) makeRequest(host string) (io.ReadCloser, error) {

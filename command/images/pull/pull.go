@@ -1,16 +1,18 @@
 package pull
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
-	"net/url"
+
+	"os"
 	"strings"
 
 	"github.com/mitchellh/cli"
+	"github.com/nitrous-io/freighter/freighterclient"
 	"github.com/nitrous-io/nitro/command"
 	"github.com/nitrous-io/nitro/command/images"
+	"github.com/nitrous-io/nitro/pkg/jsonstream"
+	"github.com/nitrous-io/nitro/pkg/nitrousapi"
 	"github.com/nitrous-io/nitrous-common/httpclient"
 	flag "github.com/ogier/pflag"
 )
@@ -28,7 +30,7 @@ type Response struct {
 }
 
 type Command struct {
-	UI     command.UI
+	UI     *cli.BasicUi
 	Server string
 	Client *httpclient.Client
 }
@@ -39,7 +41,10 @@ func init() {
 
 func NewCommand(token string) (cli.Command, error) {
 	return &Command{
-		UI:     command.DefaultUI,
+		UI: &cli.BasicUi{
+			Reader: os.Stdin,
+			Writer: os.Stdout,
+		},
 		Server: command.Env.APIURL,
 		Client: httpclient.New(token),
 	}, nil
@@ -64,45 +69,41 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	stdout, ok := c.UI.Writer.(*os.File)
+	if !ok {
+		c.UI.Error("Requires a working terminal")
+		return 1
+	}
+
 	host, image := args[0], args[1]
+
+	h, err := nitrousapi.GetHost(c.Client, c.Server, host)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("failed to get host %s", host))
+		return 1
+	}
+
+	client := freighterclient.NewClient(freighterclient.NewHost(
+		h.IPAddress,
+		int(h.FreighterdPort),
+		h.Domain,
+	))
 
 	c.UI.Output(fmt.Sprintf("Pulling image '%s' to '%s'...", image, host))
 
-	body, err := c.makeRequest(host, image)
-	if err != nil {
-		c.UI.Error(err.Error())
-		return 1
-	}
-	err = c.handleResponse(body)
-	if err != nil {
-		c.UI.Error(err.Error())
-		return 1
-	}
+	reader, writer := io.Pipe()
 
+	// decode and write the json stream output to stdout
+	go jsonstream.DisplayJSONMessagesStream(reader, stdout, stdout.Fd(), true)
+
+	_, err = client.PullImage(image, writer)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("failed to pull image %s on host %s", image, host))
+		return 1
+	}
 	return 0
 }
 
 func (c *Command) Synopsis() string {
 	return "Pull image onto a host"
-}
-
-func (c *Command) makeRequest(host, image string) (io.ReadCloser, error) {
-	path := fmt.Sprintf("%s/api/v0/hosts/%s/images/pull", c.Server, host)
-	params := &url.Values{"repository": []string{image}}
-	resp, err := c.Client.PostFormAuthed(path, params)
-	if err != nil {
-		return nil, err
-	}
-	return resp.Body, httpclient.CheckResponse(resp, http.StatusOK)
-}
-
-func (c *Command) handleResponse(body io.ReadCloser) error {
-	defer body.Close()
-	j := Response{}
-	err := json.NewDecoder(body).Decode(&j)
-	if err != nil {
-		return err
-	}
-	c.UI.Output(images.PrettyPrint(&j.Image))
-	return nil
 }

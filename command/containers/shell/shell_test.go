@@ -44,10 +44,11 @@ var _ = Describe("Command", func() {
 		defer ns.Close()
 
 		stdin, stdout, _ := pty.Open()
+		ew := bytes.NewBuffer(nil)
 		ui := &cli.BasicUi{
 			Reader:      stdin,
 			Writer:      stdout,
-			ErrorWriter: bytes.NewBuffer(nil),
+			ErrorWriter: ew,
 		}
 		cmd := &Command{
 			UI:     ui,
@@ -58,9 +59,9 @@ var _ = Describe("Command", func() {
 		go func() {
 			defer GinkgoRecover()
 			cmd.Run([]string{containerID})
-			Expect(ui.ErrorWriter.(*bytes.Buffer).String()).To(BeEmpty())
 		}()
 
+		Consistently(ew.String()).Should(BeEmpty())
 		Eventually(ns.ts.resized).Should(Receive())
 		Eventually(ns.ts.finished).Should(BeClosed())
 	})

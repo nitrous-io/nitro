@@ -15,6 +15,7 @@ import (
 	"github.com/nitrous-io/nitrous-common/httpclient"
 
 	. "github.com/nitrous-io/nitro/command/containers"
+	"github.com/nitrous-io/nitro/command/images"
 )
 
 const (
@@ -23,6 +24,8 @@ const (
 	envUsage          = "Set environment variables for the container in the format <key>:<value>. " + command.MultiargUsage
 	volumesUsage      = "Add data volume so other containers can mount given <path>. " + command.MultiargUsage
 	portForwardsUsage = "Forward ports from container to host.  Use one of: 'ip:hostPort:containerPort', 'ip::containerPort', or 'hostPort:containerPort' specifications. " + command.MultiargUsage
+
+	defaultImage = "nitrousio/ubuntu:trusty"
 )
 
 const usage = `
@@ -52,6 +55,10 @@ type containerParams struct {
 	envVars      command.Multiarg
 	volumes      command.Multiarg
 	portForwards command.Multiarg
+}
+
+type imageResponse struct {
+	Image images.Image `json:"image"`
 }
 
 func init() {
@@ -99,6 +106,18 @@ func (c *Command) Run(args []string) int {
 
 	if params.slug == "" {
 		params.slug = randomnamegenerator.Generate("container")
+	}
+
+	if params.image == "" {
+		c.UI.Output(fmt.Sprintf("Using default image %s", defaultImage))
+		params.image = defaultImage
+	}
+
+	c.UI.Output(fmt.Sprintf("Pulling image '%s' on '%s'. Please wait...", params.image, params.host))
+	if err := c.pullImage(params.host, params.image); err != nil {
+		c.UI.Error(fmt.Sprintf("Failed to pull image %s on host %s: %s",
+			params.image, params.host, err))
+		return 1
 	}
 
 	c.UI.Output(fmt.Sprintf("Creating container on '%s'. Please wait...", params.host))
@@ -161,4 +180,18 @@ func (c *Command) createContainer(cp *containerParams) (*Container, error) {
 	}
 
 	return j.Container, nil
+}
+
+func (c *Command) pullImage(host, image string) error {
+	path := fmt.Sprintf("%s/api/v0/hosts/%s/images/pull", c.Server, host)
+	params := &url.Values{"repository": []string{image}}
+	resp, err := c.Client.PostFormAuthed(path, params)
+	if err != nil {
+		return err
+	}
+	if err := httpclient.CheckResponse(resp, http.StatusOK); err != nil {
+		return err
+	}
+	resp.Body.Close()
+	return nil
 }

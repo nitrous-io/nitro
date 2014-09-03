@@ -1,13 +1,10 @@
 package ibuild_test
 
 import (
-	"bytes"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
-	"os/exec"
-	"path"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -36,42 +33,16 @@ var _ = Describe("images/ibuild", func() {
 		responseBody string
 		tmpdir       string
 		expectedSlug string
-		dfBytes      = []byte("FROM scratch")
 	)
 
-	makeDockerfile := func(dfPath string) string {
-		if dfPath == "" {
-			dfPath = path.Join(tmpdir, "Dockerfile")
-		}
-		err := ioutil.WriteFile(dfPath, dfBytes, 0600)
+	makeFile := func() string {
+		tmpdir, err := ioutil.TempDir("", "nitro-build")
 		Expect(err).To(BeNil())
-		return dfPath
-	}
 
-	// creates and closes tmp file, returns filename, caller to remove file
-	makeInvalidTar := func() string {
-		f, err := ioutil.TempFile(tmpdir, "build-invalid-tar")
+		path := filepath.Join(tmpdir, "Dockerfile")
+		err = ioutil.WriteFile(path, []byte("FROM scratch"), 0600)
 		Expect(err).To(BeNil())
-		defer f.Close()
-		_, err = f.Write([]byte("not tar"))
-		Expect(err).To(BeNil())
-		return f.Name()
-	}
-
-	// creates and closes tmp file, returns filename, caller to remove file
-	makeValidTar := func() string {
-		// building a tar with Go here would be replicating dockerfileTar, so
-		// use tar command to build
-		f, err := ioutil.TempFile(tmpdir, "build-valid-tar")
-		Expect(err).To(BeNil())
-		f.Close()
-
-		dfPath := makeDockerfile("")
-		cmd := exec.Command("tar", "cf", f.Name(), path.Base(dfPath))
-		cmd.Dir = tmpdir
-		err = cmd.Run()
-		Expect(err).To(BeNil())
-		return f.Name()
+		return path
 	}
 
 	BeforeEach(func() {
@@ -90,16 +61,12 @@ var _ = Describe("images/ibuild", func() {
 				}
 			},
 			func(w http.ResponseWriter, req *http.Request) {
-				// check that request sends tarball in desired format
-				// in 'file' param
+				// check if the request has 'file' param set
 				f, _, err := req.FormFile("file")
 				Expect(err).To(BeNil())
 				defer f.Close()
-				filename := make([]byte, 100) // tar header filename is 0-100
-				_, err = f.Read(filename)
-				Expect(err).To(BeNil())
-				Expect(string(bytes.Trim(filename, "\x00"))).To(Equal("Dockerfile"))
-				f.Seek(512, 0) // tar file header is 512 bytes
+
+				dfBytes := []byte("FROM scratch")
 				buf := make([]byte, len(dfBytes))
 				_, err = f.Read(buf)
 				Expect(err).To(BeNil())
@@ -129,29 +96,14 @@ var _ = Describe("images/ibuild", func() {
 			return cmd.Run([]string{"myhost", fpath})
 		}
 
-		Context("successful build with Dockerfile", func() {
+		Context("successful build", func() {
 			BeforeEach(func() {
 				statusCode = http.StatusOK
 				responseBody = `{"status":"OK"}`
 			})
 
-			It("uploads Dockerfile inside tar", func() {
-				fpath := makeDockerfile("")
-				code := doCmd(fpath)
-				Expect(ui.OutputWriter.String()).To(ContainSubstring("Built image"))
-				Expect(code).To(Equal(0))
-				Expect(srv.ReceivedRequests()).To(HaveLen(1))
-			})
-		})
-
-		Context("successful build with tarball", func() {
-			BeforeEach(func() {
-				statusCode = http.StatusOK
-				responseBody = `{"status":"OK"}`
-			})
-
-			It("uploads tarball", func() {
-				fpath := makeValidTar()
+			It("uploads the given file", func() {
+				fpath := makeFile()
 				code := doCmd(fpath)
 				Expect(ui.OutputWriter.String()).To(ContainSubstring("Built image"))
 				Expect(code).To(Equal(0))
@@ -167,7 +119,7 @@ var _ = Describe("images/ibuild", func() {
 			})
 
 			It("uses slug", func() {
-				fpath := makeDockerfile("")
+				fpath := makeFile()
 				code := cmd.Run([]string{"myhost", fpath, "--slug=UseThisSlug"})
 				Expect(ui.OutputWriter.String()).To(ContainSubstring("Built image"))
 				Expect(code).To(Equal(0))
@@ -191,7 +143,7 @@ var _ = Describe("images/ibuild", func() {
 			})
 
 			It("outputs error message", func() {
-				fpath := makeDockerfile("")
+				fpath := makeFile()
 				code := doCmd(fpath)
 				Expect(ui.ErrorWriter.String()).To(Equal("image not found\n"))
 				Expect(code).To(Equal(1))
@@ -213,52 +165,6 @@ var _ = Describe("images/ibuild", func() {
 	Context("Help", func() {
 		It("outputs usage", func() {
 			Expect(cmd.Help()).To(ContainSubstring("Usage: nitro images:build"))
-		})
-	})
-
-	Context("isValidTar()", func() {
-		It("is true with valid tarfile", func() {
-			path := makeValidTar()
-			f, err := os.Open(path)
-			Expect(err).To(BeNil())
-			defer f.Close()
-			Expect(ibuild.IsValidTar(f)).To(BeTrue())
-		})
-
-		It("is true with valid tarfile that contains a './Dockerfile' in the archive root", func() {
-			tarpath := path.Join(tmpdir, "valid.tar")
-			// Create a tarball using "tar cf file.tar ./*".
-			// This results in a tarball listing with name "./Dockerfile"
-			makeDockerfile(path.Join(tmpdir, "Dockerfile"))
-			cmd := exec.Command("sh", "-c", fmt.Sprintf("tar cf %s ./*", tarpath))
-			cmd.Dir = tmpdir
-			err := cmd.Run()
-			Expect(err).To(BeNil())
-
-			f, err := os.Open(tarpath)
-			Expect(err).To(BeNil())
-			defer f.Close()
-			Expect(ibuild.IsValidTar(f)).To(BeTrue())
-		})
-
-		It("is false with invalid tarfile", func() {
-			path := makeInvalidTar()
-			f, err := os.Open(path)
-			Expect(err).To(BeNil())
-			defer f.Close()
-			Expect(ibuild.IsValidTar(f)).NotTo(BeTrue())
-		})
-	})
-
-	Context("dockerfileTar()", func() {
-		It("produces valid tarfile", func() {
-			dfPath := makeDockerfile("")
-			f, err := os.Open(dfPath)
-			Expect(err).To(BeNil())
-			defer f.Close()
-			r, err := ibuild.DockerfileTar(f)
-			Expect(err).To(BeNil())
-			Expect(ibuild.IsValidTar(r)).To(BeTrue())
 		})
 	})
 })

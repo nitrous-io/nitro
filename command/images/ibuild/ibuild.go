@@ -1,7 +1,6 @@
 package ibuild
 
 import (
-	"archive/tar"
 	"bytes"
 	"fmt"
 	"io"
@@ -9,7 +8,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
-	"path"
 	"strings"
 
 	"github.com/mitchellh/cli"
@@ -98,16 +96,27 @@ func (c *Command) makeRequest(host, fpath, slug string) error {
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 
-	r, err := loadFile(fpath)
+	f, err := os.Open(fpath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	b, err := ioutil.ReadAll(f)
 	if err != nil {
 		return err
 	}
 
-	part, err := writer.CreateFormFile("file", "buildcontext.tar")
+	s, err := f.Stat()
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(part, r); err != nil {
+
+	part, err := writer.CreateFormFile("file", s.Name())
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(part, bytes.NewBuffer(b)); err != nil {
 		return err
 	}
 	if err := writer.WriteField("slug", slug); err != nil {
@@ -129,66 +138,4 @@ func (c *Command) makeRequest(host, fpath, slug string) error {
 	}
 	defer resp.Body.Close()
 	return httpclient.CheckResponse(resp, http.StatusOK)
-}
-
-// loadFile returns a reader to path if path is a tarball, and wraps path in a
-// tarball if path is a Dockerfile
-func loadFile(fpath string) (io.Reader, error) {
-	f, err := os.Open(fpath)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	// assumption: file named Dockerfile is not a tar; all other files are tars
-	if path.Base(fpath) == "Dockerfile" {
-		return dockerfileTar(f)
-	} else {
-		b, err := ioutil.ReadAll(f)
-		if err != nil {
-			return nil, err
-		}
-
-		if !isValidTar(bytes.NewBuffer(b)) {
-			return nil, errInvalidTar
-		}
-		return bytes.NewBuffer(b), nil
-	}
-}
-
-// takes a Dockerfile and returns a tar Reader
-func dockerfileTar(f *os.File) (io.Reader, error) {
-	fi, err := f.Stat()
-	if err != nil {
-		return nil, err
-	}
-	buf := bytes.NewBuffer(nil)
-	tw := tar.NewWriter(buf)
-	hdr := &tar.Header{
-		Name: "Dockerfile",
-		Size: fi.Size(),
-	}
-	if err := tw.WriteHeader(hdr); err != nil {
-		return nil, err
-	}
-	if _, err := io.Copy(tw, f); err != nil {
-		return nil, err
-	}
-	if err := tw.Close(); err != nil {
-		return nil, err
-	}
-	return buf, nil
-}
-
-func isValidTar(r io.Reader) bool {
-	tr := tar.NewReader(r)
-	for {
-		hdr, err := tr.Next()
-		if err != nil {
-			return false
-		}
-		if hdr.Name == "Dockerfile" || hdr.Name == "./Dockerfile" {
-			return true
-		}
-	}
 }

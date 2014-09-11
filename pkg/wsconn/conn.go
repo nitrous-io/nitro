@@ -19,7 +19,7 @@ func NewConnection(w *websocket.Conn) *Conn {
 }
 
 func (c Conn) Write(b []byte) (int, error) {
-	if err := c.WriteMessage(websocket.TextMessage, b); err != nil {
+	if err := c.WriteMessage(websocket.BinaryMessage, b); err != nil {
 		return 0, err
 	}
 	return len(b), nil
@@ -29,10 +29,15 @@ func (c Conn) Read(b []byte) (int, error) {
 	if c.reader == nil {
 		t, r, err := c.NextReader()
 		if err != nil {
+			// if the connection is closed, we returns EOF instead of
+			// ErrUnexpectedEOF so io.Copy behaves sanely
+			if err == io.ErrUnexpectedEOF {
+				return 0, io.EOF
+			}
 			return 0, err
 		}
-		if t != websocket.TextMessage {
-			log.Printf("ws: ignored non-text message in stream")
+		if t != websocket.BinaryMessage {
+			log.Printf("ws: ignored non-binary message in stream")
 			return 0, nil
 		}
 		c.reader = r

@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"github.com/gorilla/websocket"
@@ -93,19 +94,27 @@ func (s *ProtoShell) Attach(fd uintptr, stdin io.Reader, stdout io.Writer) error
 	s.in = NewLocalInput(stdin)
 	s.out = NewLocalOutput(stdout)
 
-	done := make(chan error)
+	errors := make(chan error, 2)
+
+	var wg sync.WaitGroup
+
+	wg.Add(2)
+
 	go func() {
 		_, err := io.Copy(s.out, s.conn)
-		if err == io.EOF || err == io.ErrUnexpectedEOF {
-			done <- nil
-			return
+		switch err {
+		case io.EOF, io.ErrUnexpectedEOF, nil:
+			errors <- nil
+		default:
+			errors <- err
 		}
-		done <- err
+		wg.Done()
 	}()
 
 	go func() {
 		_, err := io.Copy(s.conn, s.in)
-		done <- err
+		errors <- err
+		wg.Done()
 	}()
 
 	// monitor tty size but doesnt fail when it errors because the remote end
@@ -115,7 +124,16 @@ func (s *ProtoShell) Attach(fd uintptr, stdin io.Reader, stdout io.Writer) error
 	if s.isTerminal {
 		s.monitorSize(fd)
 	}
-	return <-done
+
+	wg.Wait()
+
+	if err := <-errors; err != nil {
+		return err
+	} else if err := <-errors; err != nil {
+		return err
+	} else {
+		return nil
+	}
 }
 
 // Run executes a remote command inside a container in a specific host

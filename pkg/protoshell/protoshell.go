@@ -94,29 +94,6 @@ func (s *ProtoShell) Attach(fd uintptr, stdin io.Reader, stdout io.Writer) error
 	s.in = NewLocalInput(stdin)
 	s.out = NewLocalOutput(stdout)
 
-	errors := make(chan error, 2)
-
-	var wg sync.WaitGroup
-
-	wg.Add(2)
-
-	go func() {
-		_, err := io.Copy(s.out, s.conn)
-		switch err {
-		case io.EOF, io.ErrUnexpectedEOF, nil:
-			errors <- nil
-		default:
-			errors <- err
-		}
-		wg.Done()
-	}()
-
-	go func() {
-		_, err := io.Copy(s.conn, s.in)
-		errors <- err
-		wg.Done()
-	}()
-
 	// monitor tty size but doesnt fail when it errors because the remote end
 	// may have been terminated.
 	//
@@ -125,15 +102,20 @@ func (s *ProtoShell) Attach(fd uintptr, stdin io.Reader, stdout io.Writer) error
 		s.monitorSize(fd)
 	}
 
+	// pipe streams
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		pipeStream(s.out, s.conn, &wg)
+		s.conn.Write([]byte("c|"))
+	}()
+	go func() {
+		pipeStream(s.conn, s.in, &wg)
+		s.conn.Write([]byte("c|"))
+	}()
 	wg.Wait()
 
-	if err := <-errors; err != nil {
-		return err
-	} else if err := <-errors; err != nil {
-		return err
-	} else {
-		return nil
-	}
+	return nil
 }
 
 // Run executes a remote command inside a container in a specific host
@@ -176,4 +158,9 @@ func getSize(fd uintptr) (int, int) {
 		return defaultWidth, defaultHeight
 	}
 	return int(ws.Width), int(ws.Height)
+}
+
+func pipeStream(to io.Writer, from io.Reader, wg *sync.WaitGroup) {
+	io.Copy(to, from)
+	wg.Done()
 }

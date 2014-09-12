@@ -12,3 +12,4 @@ github.com/nitrous-io/nitrous-common #96ea72c988aef70194e43ed5e1936fb7879d96b4 !
 github.com/ogier/pflag #e4f7d00f344b0954fa3791a8527d10ba7334eceb
 github.com/onsi/ginkgo/ginkgo #12446bbcc74950944c897e32ea99cc8d058f9c92
 github.com/onsi/gomega #036273e6f643552b16fe7a6464afd2ae0324992e
+github.com/docker/docker/pkg/archive #06b74875b6e5197f7ead3655a3fda91ee38ec58b

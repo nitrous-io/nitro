@@ -42,8 +42,7 @@ var _ = Describe("containers/attach", func() {
 		Expect(err).To(BeNil())
 		// Setup handlers: attach to container.
 		fsrv.AppendHandlers(ghttp.CombineHandlers(
-			ghttp.VerifyHeaderKV("Authorization", "Token container-token"),
-			ghttp.VerifyRequest("GET", "/containers/deadbeef/attach/ws"),
+			ghttp.VerifyRequest("GET", "/containers/deadbeef/attach", "token=container-token"),
 			func(w http.ResponseWriter, r *http.Request) {
 				upgrader := websocket.Upgrader{ReadBufferSize: 1024, WriteBufferSize: 1024}
 				conn, err := upgrader.Upgrade(w, r, nil)
@@ -51,9 +50,11 @@ var _ = Describe("containers/attach", func() {
 				stream := wsconn.NewConnection(conn)
 				defer stream.Close()
 
-				stream.Write([]byte("attach output"))
-				// Write more bytes than we will read so that io.Copy will fail.
-				stream.Write([]byte("\n"))
+				stream.Write([]byte("d|attach output"))
+				// Write a heartbeat message to see if it is ignored
+				stream.Write([]byte("h"))
+				// Send a close message
+				stream.Write([]byte("c|connection closed"))
 			},
 		))
 

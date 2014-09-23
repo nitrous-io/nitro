@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
@@ -92,14 +93,14 @@ func (c *Command) Synopsis() string {
 }
 
 func (c *Command) attach(host, token, containerID string, tlsConfig *tls.Config, stdin io.Reader, stdout io.Writer) error {
-	headers := http.Header{}
-	headers.Add("Authorization", "Token "+token)
-	wsEndpointURI := fmt.Sprintf("wss://%s/containers/%s/attach/ws", host, containerID)
+	params := url.Values{}
+	params.Set("token", token)
+	wsEndpointURI := fmt.Sprintf("wss://%s/containers/%s/attach?%s", host, containerID, params.Encode())
 	dialer := websocket.Dialer{}
 	if tlsConfig != nil {
 		dialer.TLSClientConfig = tlsConfig
 	}
-	ws, _, err := dialer.Dial(wsEndpointURI, headers)
+	ws, _, err := dialer.Dial(wsEndpointURI, http.Header{})
 	if err != nil {
 		return errors.New("Failed to attach to container.")
 	}
@@ -107,6 +108,5 @@ func (c *Command) attach(host, token, containerID string, tlsConfig *tls.Config,
 	conn := wsconn.NewConnection(ws)
 	defer conn.Close()
 
-	_, err = io.Copy(stdout, conn)
-	return err
+	return containers.CopyFromWebsocket(stdout, conn)
 }

@@ -1,10 +1,12 @@
 package attach
 
 import (
+	"flag"
 	"fmt"
 	"net/url"
 
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/mitchellh/cli"
@@ -15,11 +17,16 @@ import (
 	"github.com/nitrous-io/nitrous-common/httpclient"
 )
 
-var usage = `
-Usage: nitro attach <container slug>
+var nostdinUsage = "Do not attach STDIN"
+
+var usage = fmt.Sprintf(`
+Usage: nitro attach [OPTIONS] <container slug>
 
   attach to a running container
-`
+
+Options:
+  --no-stdin=false %s.
+`, nostdinUsage)
 
 type Command struct {
 	UI     *cli.BasicUi
@@ -44,6 +51,16 @@ func NewCommand(token string) (cli.Command, error) {
 }
 
 func (c *Command) Run(args []string) int {
+	var noStdin bool
+	cmdFlags := flag.NewFlagSet("attach", flag.ContinueOnError)
+	cmdFlags.Usage = func() { c.UI.Output(c.Help()) }
+	cmdFlags.BoolVar(&noStdin, "no-stdin", false, nostdinUsage)
+
+	if err := cmdFlags.Parse(args); err != nil {
+		return 1
+	}
+
+	args = cmdFlags.Args()
 	if len(args) != 1 {
 		c.UI.Error(c.Help())
 		return 1
@@ -88,6 +105,7 @@ func (c *Command) Run(args []string) int {
 	params := url.Values{}
 	params.Set("token", token)
 	params.Set("binary", "true")
+	params.Set("nostdin", strconv.FormatBool(noStdin))
 	endpointURI := fmt.Sprintf("wss://%s/containers/%s/attach?%s", host, cn.CID, params.Encode())
 	sh := protoshell.New(endpointURI, tlsConfig)
 	if err := sh.Run(stdin.Fd(), stdout.Fd(), stdin, stdout); err != nil {

@@ -3,6 +3,7 @@ package shell
 import (
 	"crypto/tls"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 
@@ -84,6 +85,12 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	token, err := containers.GetToken(slug, c.server, []string{"shell"}, c.client)
+	if err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
+
 	// prepare the term
 	stdin, ok := c.UI.Reader.(*os.File)
 	if !ok {
@@ -98,9 +105,15 @@ func (c *Command) Run(args []string) int {
 
 	host := fmt.Sprintf("%s:%d", cr.Host.ProxyHostname, cr.Host.FreighterdPort)
 	command := getLoginCommand(username)
-	sh := protoshell.New(host, cr.CID, command, c.tlsConfig, func() (string, error) {
-		return containers.GetToken(slug, c.server, []string{"shell"}, c.client)
-	})
+
+	// construct params header that includes the wanted command
+	params := url.Values{}
+	params.Set("command", command)
+	params.Set("token", token)
+	params.Set("binary", "true")
+	endpointURI := fmt.Sprintf("wss://%s/containers/%s/shell?%s", host, cr.CID, params.Encode())
+
+	sh := protoshell.New(endpointURI, c.tlsConfig)
 	if err := sh.Run(stdin.Fd(), stdout.Fd(), stdin, stdout); err != nil {
 		c.UI.Error(fmt.Sprintf("Exited: %v", err))
 		return 1

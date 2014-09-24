@@ -25,32 +25,32 @@ const (
 type TokenHandler func() (string, error)
 
 type ProtoShell struct {
-	ID              string `json:"id"`
-	host            string
-	containerID     string
-	command         string
+	ID          string `json:"id"`
+	endpointURI string
+	params      *url.Values
+
+	// remove
+	host        string
+	containerID string
+	command     string
+	// specify that the remote command doesnt need a tty
+	NoTTY bool
+
 	isTerminalOut   bool // this checks if the current shell ouput is a interactive terminal
 	isTerminalIn    bool // this checks if the current shell input is a interactive terminal
-	tokenHandler    TokenHandler
 	tlsClientConfig *tls.Config
 	conn            *wsconn.Conn
 	netConn         net.Conn
 
 	serverIn  io.Writer
 	serverOut io.Reader
-
-	// specify that the remote command doesnt need a tty
-	NoTTY bool
 }
 
 // New creates a shell that uses WebSockets.
 // FIXME Sprinkle TLS magic (i.e. https and wss://).
-func New(host, containerID, command string, tlsConfig *tls.Config, tokenHandler TokenHandler) *ProtoShell {
+func New(endpointURI string, tlsConfig *tls.Config) *ProtoShell {
 	return &ProtoShell{
-		host:            host,
-		containerID:     containerID,
-		command:         command,
-		tokenHandler:    tokenHandler,
+		endpointURI:     endpointURI,
 		tlsClientConfig: tlsConfig,
 	}
 }
@@ -70,22 +70,6 @@ func (s *ProtoShell) Attach(infd uintptr, outfd uintptr, stdin io.ReadCloser, st
 		defer term.RestoreTerminal(outfd, oldState)
 	}
 
-	// construct token header
-	token, err := s.tokenHandler()
-	if err != nil {
-		return err
-	}
-
-	// construct params header that includes the wanted command
-	params := url.Values{}
-	params.Set("command", s.command)
-	params.Set("token", token)
-	params.Set("binary", "true")
-	if s.NoTTY {
-		params.Set("notty", "true")
-	}
-	wsEndpointURI := fmt.Sprintf("wss://%s/containers/%s/shell?%s", s.host, s.containerID, params.Encode())
-
 	dialer := websocket.Dialer{
 		NetDial: func(network, address string) (net.Conn, error) {
 			c, err := net.Dial(network, address)
@@ -101,9 +85,9 @@ func (s *ProtoShell) Attach(infd uintptr, outfd uintptr, stdin io.ReadCloser, st
 	if s.tlsClientConfig != nil {
 		dialer.TLSClientConfig = s.tlsClientConfig
 	}
-	ws, _, err := dialer.Dial(wsEndpointURI, http.Header{})
+	ws, _, err := dialer.Dial(s.endpointURI, http.Header{})
 	if err != nil {
-		return fmt.Errorf("Failed to attach to shell for container %s: %v", s.containerID, err)
+		return fmt.Errorf("Failed to connect to endpoint %s: %v", s.endpointURI, err)
 	}
 
 	s.conn = wsconn.NewConnection(ws)

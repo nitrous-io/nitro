@@ -1,22 +1,18 @@
 package attach
 
 import (
-	"crypto/tls"
-	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
+
 	"os"
 	"strings"
 
-	"github.com/gorilla/websocket"
 	"github.com/mitchellh/cli"
 	"github.com/nitrous-io/nitro/command"
 	"github.com/nitrous-io/nitro/command/containers"
 	"github.com/nitrous-io/nitro/pkg/nitrousapi"
+	"github.com/nitrous-io/nitro/pkg/protoshell"
 	"github.com/nitrous-io/nitrous-common/httpclient"
-	"github.com/nitrous-io/nitrous-common/wsconn"
 )
 
 var usage = `
@@ -77,7 +73,24 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	if err := c.attach(host, token, cn.CID, tlsConfig, c.UI.Reader, c.UI.Writer); err != nil {
+	stdin, ok := c.UI.Reader.(*os.File)
+	if !ok {
+		c.UI.Error("Requires a working terminal")
+		return 1
+	}
+	stdout, ok := c.UI.Writer.(*os.File)
+	if !ok {
+		c.UI.Error("Requires a working terminal")
+		return 1
+	}
+
+	// construct params header that includes the wanted command
+	params := url.Values{}
+	params.Set("token", token)
+	params.Set("binary", "true")
+	endpointURI := fmt.Sprintf("wss://%s/containers/%s/attach?%s", host, cn.CID, params.Encode())
+	sh := protoshell.New(endpointURI, tlsConfig)
+	if err := sh.Run(stdin.Fd(), stdout.Fd(), stdin, stdout); err != nil {
 		c.UI.Error(fmt.Sprintf("Exited: %v", err))
 		return 1
 	}
@@ -90,23 +103,4 @@ func (c *Command) Help() string {
 
 func (c *Command) Synopsis() string {
 	return "Attach to a running container"
-}
-
-func (c *Command) attach(host, token, containerID string, tlsConfig *tls.Config, stdin io.Reader, stdout io.Writer) error {
-	params := url.Values{}
-	params.Set("token", token)
-	wsEndpointURI := fmt.Sprintf("wss://%s/containers/%s/attach?%s", host, containerID, params.Encode())
-	dialer := websocket.Dialer{}
-	if tlsConfig != nil {
-		dialer.TLSClientConfig = tlsConfig
-	}
-	ws, _, err := dialer.Dial(wsEndpointURI, http.Header{})
-	if err != nil {
-		return errors.New("Failed to attach to container.")
-	}
-
-	conn := wsconn.NewConnection(ws)
-	defer conn.Close()
-
-	return containers.CopyFromWebsocket(stdout, conn)
 }

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/gorilla/websocket"
+	"github.com/kr/pty"
 	"github.com/mitchellh/cli"
 	"github.com/nitrous-io/nitro/command/containers/attach"
 	"github.com/nitrous-io/nitro/consts"
@@ -32,6 +33,8 @@ var _ = Describe("containers/attach", func() {
 		nsrv *ghttp.Server
 		// Freighter Server
 		fsrv *ghttp.Server
+
+		stdinBuffer = bytes.NewBuffer(nil)
 	)
 
 	BeforeEach(func() {
@@ -42,7 +45,12 @@ var _ = Describe("containers/attach", func() {
 		Expect(err).To(BeNil())
 		// Setup handlers: attach to container.
 		fsrv.AppendHandlers(ghttp.CombineHandlers(
-			ghttp.VerifyRequest("GET", "/containers/deadbeef/attach", "token=container-token"),
+			ghttp.VerifyRequest("GET", "/containers/deadbeef/attach"),
+			func(w http.ResponseWriter, r *http.Request) {
+				Expect(r.FormValue("binary")).To(Equal("true"))
+				Expect(r.FormValue("token")).To(Equal("container-token"))
+				Expect(r.FormValue("nostdin")).To(Equal("false"))
+			},
 			func(w http.ResponseWriter, r *http.Request) {
 				upgrader := websocket.Upgrader{ReadBufferSize: 1024, WriteBufferSize: 1024}
 				conn, err := upgrader.Upgrade(w, r, nil)
@@ -50,11 +58,8 @@ var _ = Describe("containers/attach", func() {
 				stream := wsconn.NewConnection(conn)
 				defer stream.Close()
 
+				go io.Copy(stdinBuffer, stream)
 				stream.Write([]byte("d|attach output"))
-				// Write a heartbeat message to see if it is ignored
-				stream.Write([]byte("h"))
-				// Send a close message
-				stream.Write([]byte("c|connection closed"))
 			},
 		))
 
@@ -116,12 +121,15 @@ var _ = Describe("containers/attach", func() {
 	})
 
 	It("attaches to the container", func(done Done) {
-		stdoutReader, stdout := io.Pipe()
+		stdin, stdout, err := pty.Open()
+		Expect(err).To(BeNil())
+
+		ew := bytes.NewBuffer(nil)
 		cmd := &attach.Command{
 			UI: &cli.BasicUi{
-				Reader:      bytes.NewBuffer(nil),
+				Reader:      stdin,
 				Writer:      stdout,
-				ErrorWriter: bytes.NewBuffer(nil),
+				ErrorWriter: ew,
 			},
 			Server: nsrv.URL(),
 			Client: httpclient.New("correct_token"),
@@ -133,16 +141,9 @@ var _ = Describe("containers/attach", func() {
 			close(exited)
 		}()
 
-		b := make([]byte, len("attach output"))
-		_, err := stdoutReader.Read(b)
-		Expect(err).To(BeNil())
-		Expect(string(b)).To(Equal("attach output"))
-
-		// Close pipe so that the command will exit.
-		stdout.Close()
-		stdoutReader.Close()
-
 		<-exited
+
+		Expect(ew.String()).To(BeEmpty())
 		close(done)
 
 		Expect(nsrv.ReceivedRequests()).To(HaveLen(3))

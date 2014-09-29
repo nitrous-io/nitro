@@ -33,6 +33,7 @@ Options:
 
   -s, --slug=""           %s
   -i, --image=""          %s
+  -c, --command=""        %s
   -e, --env=[]            %s
   -v, --volume=[]         %s
   -p, --port-forward=[]   %s
@@ -49,6 +50,7 @@ type containerParams struct {
 	host           string
 	slug           string
 	image          string
+	cmd            string
 	envVars        command.Multiarg
 	volumes        command.Multiarg
 	portForwards   command.Multiarg
@@ -73,7 +75,7 @@ func NewCommand(token string) (cli.Command, error) {
 func (c *Command) Help() string {
 	// TODO this is getting unwieldy, maybe text/template
 	return strings.TrimSpace(fmt.Sprintf(usage, slugUsage,
-		imageUsage, containers.EnvUsage, containers.VolumesUsage, containers.PortForwardsUsage, containers.PortForwardAllUsage))
+		imageUsage, containers.CmdUsage, containers.EnvUsage, containers.VolumesUsage, containers.PortForwardsUsage, containers.PortForwardAllUsage))
 }
 
 func (c *Command) Run(args []string) int {
@@ -83,6 +85,7 @@ func (c *Command) Run(args []string) int {
 	cmdFlags.Usage = func() { c.UI.Output(c.Help()) }
 	cmdFlags.StringVarP(&params.slug, "slug", "s", "", slugUsage)
 	cmdFlags.StringVarP(&params.image, "image", "i", "", imageUsage)
+	cmdFlags.StringVarP(&params.cmd, "command", "c", "", containers.CmdUsage)
 
 	cmdFlags.VarP(&params.envVars, "env", "e", containers.EnvUsage)
 	cmdFlags.VarP(&params.volumes, "volume", "v", containers.VolumesUsage)
@@ -174,6 +177,9 @@ func (c *Command) createContainer(cp *containerParams) (*createResponse, error) 
 	}
 	if cp.image != "" {
 		p.Set("image", cp.image)
+	}
+	if cp.cmd != "" {
+		p.Set("cmd", cp.cmd)
 	}
 	for _, e := range cp.envVars {
 		p.Add("env[]", e)

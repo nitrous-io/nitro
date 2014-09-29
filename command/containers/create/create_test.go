@@ -92,6 +92,7 @@ var _ = Describe("containers/create", func() {
 			"host-1",
 			"--slug=" + slug,
 			"--image=ubuntu",
+			"--command=/bin/dash -c \"echo 'hi'\"",
 			"--env=PAGER=most",
 			"--volume=/shared", // repeat args supported
 			"--volume=/music",
@@ -135,6 +136,19 @@ var _ = Describe("containers/create", func() {
 		})
 	})
 
+	Context("when cmd is not specified", func() {
+		It("should be omitted from the request", func() {
+			cmd.Run([]string{
+				"host-1",
+				"--slug=" + slug,
+			})
+			reqs := srv.ReceivedRequests()
+			Expect(reqs).To(HaveLen(2))
+			_, found := reqs[1].Form["cmd"]
+			Expect(found).To(BeFalse())
+		})
+	})
+
 	Context("when pull image request fails", func() {
 		It("does not make the subsequent create request", func() {
 			pullStatusCode = http.StatusInternalServerError
@@ -162,6 +176,7 @@ var _ = Describe("containers/create", func() {
 
 			Expect(createReq.PostFormValue("slug")).To(Equal(slug))
 			Expect(createReq.PostFormValue("image")).To(Equal("ubuntu"))
+			Expect(createReq.PostFormValue("cmd")).To(Equal("/bin/dash -c \"echo 'hi'\""))
 			Expect(createReq.PostForm["env[]"]).To(Equal([]string{"PAGER=most"}))
 			Expect(createReq.PostForm["volume[]"]).To(Equal([]string{"/shared", "/music"}))
 			Expect(createReq.PostForm["port[]"]).To(Equal([]string{"8080:3000", "127.0.0.1:4242"}))

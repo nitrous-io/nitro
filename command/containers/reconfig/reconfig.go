@@ -27,6 +27,7 @@ Options:
   -v, --volume=[]         %s
   -p, --port-forward=[]   %s
   -P, --port-forward-all  %s
+  -c, --command=""        %s
 `
 
 type Command struct {
@@ -40,6 +41,7 @@ type containerParams struct {
 	volumes        command.Multiarg
 	portForwards   command.Multiarg
 	portForwardAll bool
+	cmd            string
 }
 
 func init() {
@@ -59,7 +61,8 @@ func (c *Command) Help() string {
 		containers.EnvUsage,
 		containers.VolumesUsage,
 		containers.PortForwardsUsage,
-		containers.PortForwardAllUsage))
+		containers.PortForwardAllUsage,
+		containers.Cmd))
 }
 
 func (c *Command) Run(args []string) int {
@@ -72,6 +75,7 @@ func (c *Command) Run(args []string) int {
 	cmdFlags.VarP(&params.volumes, "volume", "v", containers.VolumesUsage)
 	cmdFlags.VarP(&params.portForwards, "port-forward", "p", containers.PortForwardsUsage)
 	cmdFlags.BoolVarP(&params.portForwardAll, "port-forward-all", "P", false, containers.PortForwardAllUsage)
+	cmdFlags.StringVarP(&params.cmd, "command", "c", "", containers.Cmd)
 
 	err := cmdFlags.Parse(args)
 	if err != nil {
@@ -112,6 +116,10 @@ func (c *Command) reconfig(slug string, cp *containerParams) (*containers.Contai
 	}
 	for _, pf := range cp.portForwards {
 		p.Add("port[]", pf)
+	}
+
+	if cp.cmd != "" {
+		p.Add("cmd", cp.cmd)
 	}
 
 	resp, err := c.Client.PostFormAuthed(fmt.Sprintf("%s/api/v0/containers/%s/reconfig", c.Server, slug), p)

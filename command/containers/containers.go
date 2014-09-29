@@ -27,6 +27,7 @@ const (
 	VolumesUsage        = "Add data volume so other containers can mount given <path>. " + command.MultiargUsage
 	PortForwardsUsage   = "Forward ports from container to host.  Use one of: 'public:hostPort:containerPort', 'private:hostPort:containerPort', 'public::containerPort', or 'private::containerPort' specifications. Publicly forwarded ports will be accessible via the host. " + command.MultiargUsage
 	PortForwardAllUsage = "Forward all ports specified by EXPOSE command in Dockerfile"
+	Cmd                 = "The command to be executed by the container"
 )
 
 func GetToken(slug, server string, permissions []string, client *httpclient.Client) (string, error) {

@@ -28,7 +28,6 @@ var _ = Describe("hosts/restart", func() {
 		w   *io.PipeWriter
 
 		srv          *ghttp.Server
-		handlers     http.HandlerFunc
 		statusCode   int
 		responseBody string
 	)
@@ -37,13 +36,15 @@ var _ = Describe("hosts/restart", func() {
 		r, w = io.Pipe()
 		ui = &command.MockUI{&cli.MockUi{InputReader: r}}
 
-		handlers = ghttp.CombineHandlers(
+		srv = ghttp.NewServer()
+		srv.AppendHandlers(ghttp.CombineHandlers(
 			ghttp.VerifyHeaderKV("Authorization", "Bearer correct_token"),
 			ghttp.VerifyRequest("POST", "/api/v0/hosts/foo-host-42/restart"),
+			func(w http.ResponseWriter, r *http.Request) {
+				r.ParseForm()
+			},
 			ghttp.RespondWithPtr(&statusCode, &responseBody),
-		)
-		srv = ghttp.NewServer()
-		srv.AppendHandlers(handlers)
+		))
 
 		cmd = &restart.Command{
 			UI:     ui,
@@ -73,6 +74,15 @@ var _ = Describe("hosts/restart", func() {
 				code := doCmd()
 				Expect(ui.OutputWriter.String()).To(ContainSubstring("Done"))
 				Expect(code).To(Equal(0))
+			})
+
+			It("sets ignore-containers param to true if --ignore-containers is specified", func() {
+				code := cmd.Run([]string{"foo-host-42", "--force", "--ignore-containers"})
+				Expect(code).To(Equal(0))
+
+				reqs := srv.ReceivedRequests()
+				Expect(reqs).To(HaveLen(1))
+				Expect(reqs[0].PostFormValue("ignore-containers")).To(Equal("true"))
 			})
 
 			Context("when --force option is not specified", func() {

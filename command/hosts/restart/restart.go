@@ -3,6 +3,7 @@ package restart
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/mitchellh/cli"
@@ -11,17 +12,21 @@ import (
 	flag "github.com/ogier/pflag"
 )
 
-const forceUsage = "Skip confirmation"
+const (
+	forceUsage  = "Skip confirmation"
+	ignoreUsage = "Restart host even if its containers cannot be stopped"
+)
 
-const usage = `
+var usage = fmt.Sprintf(`
 Usage: nitro restart <slug>
 
   restart a host
 
 Options:
 
-  -f, --force=""    %s
-`
+  -f, --force=false               %s
+  -i, --ignore-containers=false   %s
+`, forceUsage, ignoreUsage)
 
 type Command struct {
 	UI     command.UI
@@ -42,14 +47,14 @@ func NewCommand(token string) (cli.Command, error) {
 }
 
 func (c *Command) Run(args []string) int {
-	var force bool
+	var force, ignoreContainers bool
 
 	cmdFlags := flag.NewFlagSet("hosts:restart", flag.ContinueOnError)
 	cmdFlags.Usage = func() { c.UI.Output(c.Help()) }
 	cmdFlags.BoolVarP(&force, "force", "f", false, forceUsage)
+	cmdFlags.BoolVarP(&ignoreContainers, "ignore-containers", "i", false, ignoreUsage)
 
-	err := cmdFlags.Parse(args)
-	if err != nil {
+	if err := cmdFlags.Parse(args); err != nil {
 		return 1
 	}
 
@@ -79,8 +84,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	c.UI.Output(fmt.Sprintf("Restarting host %s...", slug))
-	err = c.restart(slug)
-	if err != nil {
+	if err := c.restart(slug, ignoreContainers); err != nil {
 		c.UI.Error(fmt.Sprintf("Failed: %s", err.Error()))
 		return 1
 	}
@@ -90,16 +94,20 @@ func (c *Command) Run(args []string) int {
 }
 
 func (c *Command) Help() string {
-	return strings.TrimSpace(fmt.Sprintf(usage, forceUsage))
+	return strings.TrimSpace(usage)
 }
 
 func (c *Command) Synopsis() string {
 	return "Restart a host"
 }
 
-func (c *Command) restart(slug string) error {
-	url := fmt.Sprintf("%s/api/v0/hosts/%s/restart", c.Server, slug)
-	resp, err := c.Client.PostFormAuthed(url, nil)
+func (c *Command) restart(slug string, ignoreContainers bool) error {
+	u := fmt.Sprintf("%s/api/v0/hosts/%s/restart", c.Server, slug)
+	params := &url.Values{}
+	if ignoreContainers {
+		params.Set("ignore-containers", "true")
+	}
+	resp, err := c.Client.PostFormAuthed(u, params)
 	if err != nil {
 		return err
 	}

@@ -101,13 +101,17 @@ var _ = Describe("logs", func() {
 			},
 		))
 
+		tlsConf, err := command.ClientConfig(test.SampleHostname)
+		Expect(err).To(BeNil(), "failed to generate client tls config")
+
 		cmd = &logs.Command{
 			UI: &command.BasicUI{cli.BasicUi{
 				Writer:      stdout,
 				ErrorWriter: bytes.NewBuffer(nil),
 			}},
-			Server: nsrv.URL(),
-			Client: httpclient.New("correct_token"),
+			Server:    nsrv.URL(),
+			Client:    httpclient.New("correct_token"),
+			TLSConfig: tlsConf,
 		}
 	})
 
@@ -145,14 +149,18 @@ var _ = Describe("logs", func() {
 		})
 
 		It("get logs of the container", func(done Done) {
+			tlsConf, err := command.ClientConfig(test.SampleHostname)
+			Expect(err).To(BeNil(), "failed to generate client tls config")
+
 			stdoutReader, stdout := io.Pipe()
 			cmd = &logs.Command{
 				UI: &command.BasicUI{cli.BasicUi{
 					Writer:      stdout,
 					ErrorWriter: bytes.NewBuffer(nil),
 				}},
-				Server: nsrv.URL(),
-				Client: httpclient.New("correct_token"),
+				Server:    nsrv.URL(),
+				Client:    httpclient.New("correct_token"),
+				TLSConfig: tlsConf,
 			}
 
 			exited := make(chan struct{})
@@ -162,7 +170,7 @@ var _ = Describe("logs", func() {
 			}()
 
 			b := make([]byte, len("hello im a log"))
-			_, err := stdoutReader.Read(b)
+			_, err = stdoutReader.Read(b)
 			Expect(err).To(BeNil())
 			Expect(string(b)).To(Equal("hello im a log"))
 

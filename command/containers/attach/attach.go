@@ -1,6 +1,7 @@
 package attach
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"net/url"
@@ -29,9 +30,10 @@ Options:
 `, nostdinUsage)
 
 type Command struct {
-	UI     *cli.BasicUi
-	Client *httpclient.Client
-	Server string
+	UI        *cli.BasicUi
+	Client    *httpclient.Client
+	Server    string
+	TLSConfig *tls.Config
 }
 
 func init() {
@@ -45,8 +47,9 @@ func NewCommand(token string) (cli.Command, error) {
 			Writer:      os.Stdout,
 			ErrorWriter: os.Stderr,
 		},
-		Server: command.Env.APIURL,
-		Client: httpclient.New(token),
+		Server:    command.Env.APIURL,
+		Client:    httpclient.New(token),
+		TLSConfig: nil,
 	}, nil
 }
 
@@ -83,13 +86,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	host := fmt.Sprintf("%s:%d", cn.Host.IPAddress, cn.Host.FreighterdPort)
-	tlsConfig, err := command.ClientConfig(cn.Host.Hostname)
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error establishing secure connection to %s", host))
-		return 1
-	}
-
+	host := fmt.Sprintf("%s:%d", cn.Host.ProxyHostname, cn.Host.FreighterdPort)
 	stdin, ok := c.UI.Reader.(*os.File)
 	if !ok {
 		c.UI.Error("Requires a working terminal")
@@ -107,7 +104,7 @@ func (c *Command) Run(args []string) int {
 	params.Set("binary", "true")
 	params.Set("nostdin", strconv.FormatBool(noStdin))
 	endpointURI := fmt.Sprintf("wss://%s/containers/%s/attach?%s", host, cn.CID, params.Encode())
-	sh := protoshell.New(endpointURI, tlsConfig)
+	sh := protoshell.New(endpointURI, c.TLSConfig)
 	if err := sh.Run(stdin.Fd(), stdout.Fd(), stdin, stdout); err != nil {
 		c.UI.Error(fmt.Sprintf("Exited: %v", err))
 		return 1

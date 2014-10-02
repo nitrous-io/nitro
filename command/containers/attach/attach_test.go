@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/kr/pty"
 	"github.com/mitchellh/cli"
+	"github.com/nitrous-io/nitro/command"
 	"github.com/nitrous-io/nitro/command/containers/attach"
 	"github.com/nitrous-io/nitro/consts"
 	"github.com/nitrous-io/nitrous-common/httpclient"
@@ -124,6 +125,9 @@ var _ = Describe("containers/attach", func() {
 		stdin, stdout, err := pty.Open()
 		Expect(err).To(BeNil())
 
+		tlsConf, err := command.ClientConfig(test.SampleHostname)
+		Expect(err).To(BeNil(), "failed to generate client tls config")
+
 		ew := bytes.NewBuffer(nil)
 		cmd := &attach.Command{
 			UI: &cli.BasicUi{
@@ -131,8 +135,9 @@ var _ = Describe("containers/attach", func() {
 				Writer:      stdout,
 				ErrorWriter: ew,
 			},
-			Server: nsrv.URL(),
-			Client: httpclient.New("correct_token"),
+			Server:    nsrv.URL(),
+			Client:    httpclient.New("correct_token"),
+			TLSConfig: tlsConf,
 		}
 
 		exited := make(chan struct{})

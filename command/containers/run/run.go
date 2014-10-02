@@ -1,6 +1,7 @@
 package run
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net/url"
 	"os"
@@ -34,9 +35,10 @@ func init() {
 }
 
 type Command struct {
-	UI     *cli.BasicUi
-	client *httpclient.Client
-	server string
+	UI        *cli.BasicUi
+	client    *httpclient.Client
+	server    string
+	tlsConfig *tls.Config
 }
 
 func NewCommand(token string) (cli.Command, error) {
@@ -45,8 +47,9 @@ func NewCommand(token string) (cli.Command, error) {
 			Reader: os.Stdin,
 			Writer: os.Stdout,
 		},
-		server: command.Env.APIURL,
-		client: httpclient.New(token),
+		server:    command.Env.APIURL,
+		client:    httpclient.New(token),
+		tlsConfig: nil,
 	}, nil
 }
 
@@ -107,7 +110,7 @@ func (c *Command) Run(args []string) int {
 	params.Set("notty", strconv.FormatBool(noTTY))
 	endpointURI := fmt.Sprintf("wss://%s/containers/%s/shell?%s", host, cr.CID, params.Encode())
 
-	sh := protoshell.New(endpointURI, nil)
+	sh := protoshell.New(endpointURI, c.tlsConfig)
 	if err := sh.Run(stdin.Fd(), stdout.Fd(), stdin, stdout); err != nil {
 		c.UI.Error(fmt.Sprintf("Exited: %v", err))
 		return 1

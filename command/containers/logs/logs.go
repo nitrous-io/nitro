@@ -46,6 +46,8 @@ type Command struct {
 	UI     *command.BasicUI
 	Client *httpclient.Client
 	Server string
+
+	TLSConfig *tls.Config
 }
 
 // `logs` command requires user to be logged in first via `nitro login`
@@ -61,8 +63,9 @@ func NewCommand(token string) (cli.Command, error) {
 			Writer:      os.Stdout,
 			ErrorWriter: os.Stderr,
 		}},
-		Server: command.Env.APIURL,
-		Client: httpclient.New(token),
+		Server:    command.Env.APIURL,
+		Client:    httpclient.New(token),
+		TLSConfig: nil,
 	}, nil
 }
 
@@ -101,20 +104,14 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	host := fmt.Sprintf("%s:%d", cr.Host.IPAddress, cr.Host.FreighterdPort)
-	tlsConfig, err := command.ClientConfig(cr.Host.Hostname)
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error establishing secure connection to %s", host))
-		return 1
-	}
-
+	host := fmt.Sprintf("%s:%d", cr.Host.ProxyHostname, cr.Host.FreighterdPort)
 	params := &url.Values{}
 	params.Set("follow", strconv.FormatBool(follow))
 	params.Set("timestamps", strconv.FormatBool(timestamps))
 	params.Set("tail", tail)
 	params.Set("token", token)
 
-	if err := c.logs(host, cr.CID, tlsConfig, params, c.UI.Reader, c.UI.Writer); err != nil {
+	if err := c.logs(host, cr.CID, c.TLSConfig, params, c.UI.Reader, c.UI.Writer); err != nil {
 		c.UI.Error(fmt.Sprintf("Exited: %v", err))
 		return 1
 	}

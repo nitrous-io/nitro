@@ -16,6 +16,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/kr/pty"
 	"github.com/mitchellh/cli"
+	"github.com/nitrous-io/nitro/command"
 	"github.com/nitrous-io/nitro/consts"
 	"github.com/nitrous-io/nitrous-common/httpclient"
 	"github.com/nitrous-io/nitrous-common/wsconn"
@@ -71,10 +72,13 @@ var _ = Describe("Command", func() {
 			Writer:      stdout,
 			ErrorWriter: ew,
 		}
+		tlsConf, err := command.ClientConfig(test.SampleHostname)
+		Expect(err).To(BeNil(), "failed to generate client tls config")
 		cmd := &Command{
-			UI:     ui,
-			server: ns.srv.URL,
-			client: httpclient.New("authtoken"), // FIXME This doesn't do anything.
+			UI:        ui,
+			server:    ns.srv.URL,
+			client:    httpclient.New("authtoken"), // FIXME This doesn't do anything.
+			tlsConfig: tlsConf,
 		}
 
 		exited := make(chan struct{})
@@ -142,6 +146,7 @@ func (s *nitrousServer) getHost(w http.ResponseWriter, r *http.Request) {
 	portInt, _ := strconv.ParseInt(port, 10, 64)
 	resp := map[string]interface{}{
 		"ip_address":      host,
+		"proxy_hostname":  host,
 		"freighterd_port": portInt,
 		"hostname":        test.SampleHostname,
 	}
@@ -182,7 +187,8 @@ type testServer struct {
 	containerToken string
 
 	stdin, stdout *bytes.Buffer
-	finished      chan struct{}
+	// signal that the shell is called and finished
+	finished chan struct{}
 }
 
 func (s *testServer) newShell(w http.ResponseWriter, r *http.Request) {
@@ -217,9 +223,10 @@ func newTestServer(containerID, shellID, containerToken string) *testServer {
 	}
 	r := mux.NewRouter()
 	r.HandleFunc("/containers/{id}/shell", s.newShell).Methods("GET")
+
 	srv := httptest.NewServer(r)
 	tlsSrv, err := test.NewTLSServer(srv.Config.Handler, test.SampleHostname, consts.CACert)
-	Expect(err).To(BeNil())
+	Expect(err).To(BeNil(), "failed to start tls server")
 	s.srv = tlsSrv
 	return s
 }

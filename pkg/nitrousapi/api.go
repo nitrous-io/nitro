@@ -29,6 +29,7 @@ type HostAPI struct {
 	IPAddress      string `json:"ip_address"`
 	FreighterdPort int64  `json:"freighterd_port"`
 	Hostname       string `json:"hostname"`
+	ProxyHostname  string `json:"proxy_hostname"`
 }
 
 type hostResp struct {

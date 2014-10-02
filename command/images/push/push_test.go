@@ -32,7 +32,7 @@ var _ = Describe("images/push", func() {
 		ui = &command.MockUI{&cli.MockUi{}}
 		handlers := ghttp.CombineHandlers(
 			func(w http.ResponseWriter, req *http.Request) {
-				Expect(req.FormValue("destination")).To(Equal("username/myscratch"))
+				Expect(req.FormValue("repository")).To(Equal("username/myscratch"))
 			},
 			ghttp.VerifyHeaderKV("Authorization", "Bearer correct_token"),
 			ghttp.VerifyRequest("POST", "/api/v0/hosts/myhost/images/scratch/push"),

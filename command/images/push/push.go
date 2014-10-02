@@ -57,10 +57,10 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	host, image, dest := args[0], args[1], args[2]
-	c.UI.Output(fmt.Sprintf("Pushing image '%s' on '%s' to '%s'...", image, host, dest))
+	host, image, repo := args[0], args[1], args[2]
+	c.UI.Output(fmt.Sprintf("Pushing image '%s' on '%s' to '%s'...", image, host, repo))
 
-	if err := c.makeRequest(host, image, dest); err != nil {
+	if err := c.makeRequest(host, image, repo); err != nil {
 		c.UI.Error(err.Error())
 		return 1
 	}
@@ -73,9 +73,9 @@ func (c *Command) Synopsis() string {
 	return "Push image on a host to a registry"
 }
 
-func (c *Command) makeRequest(host, image, dest string) error {
+func (c *Command) makeRequest(host, image, repo string) error {
 	path := fmt.Sprintf("%s/api/v0/hosts/%s/images/%s/push", c.Server, host, image)
-	params := &url.Values{"destination": []string{dest}}
+	params := &url.Values{"repository": []string{repo}}
 	resp, err := c.Client.PostFormAuthed(path, params)
 	if err != nil {
 		return err

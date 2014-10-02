@@ -28,6 +28,8 @@ var _ = Describe("containers/reconfig", func() {
 		handlers     http.HandlerFunc
 		statusCode   int
 		responseBody string
+
+		expectedCmd string
 	)
 
 	BeforeEach(func() {
@@ -37,6 +39,12 @@ var _ = Describe("containers/reconfig", func() {
 				Expect(err).To(BeNil())
 				Expect(req.PostForm["volume[]"]).To(Equal([]string{"/shared", "/music"}))
 				Expect(req.PostForm["port[]"]).To(Equal([]string{"8080:3000", "127.0.0.1:4242"}))
+				if expectedCmd == "" {
+					_, found := req.Form["cmd"]
+					Expect(found).To(BeFalse())
+				} else {
+					Expect(req.PostFormValue("cmd")).To(Equal(expectedCmd))
+				}
 			},
 			ghttp.VerifyHeaderKV("Authorization", "Bearer a_token"),
 			ghttp.VerifyRequest("POST", "/api/v0/containers/wild-rocket-23/reconfig"),
@@ -58,11 +66,16 @@ var _ = Describe("containers/reconfig", func() {
 	})
 
 	Context("nitro reconfig containerslug", func() {
+		BeforeEach(func() {
+			expectedCmd = "/bin/dash -c \"echo 'hi'\""
+		})
+
 		doCmd := func() int {
 			return cmd.Run([]string{
 				"--volume=/shared",
 				"--volume=/music",
 				"--port-forward=8080:3000,127.0.0.1:4242",
+				"--command=/bin/dash -c \"echo 'hi'\"",
 				"wild-rocket-23",
 			})
 		}
@@ -95,6 +108,21 @@ wild-rocket-23    wild-rocket-reconfig-image    running
 				Expect(code).To(Equal(1))
 			})
 		})
+
+		Context("when the command is not given", func() {
+			BeforeEach(func() {
+				expectedCmd = ""
+			})
+			It("should not send a cmd form value", func() {
+				cmd.Run([]string{
+					"--volume=/shared",
+					"--volume=/music",
+					"--port-forward=8080:3000,127.0.0.1:4242",
+					"wild-rocket-23",
+				})
+			})
+		})
+
 	})
 
 	Context("when slug is not given", func() {

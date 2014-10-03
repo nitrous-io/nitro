@@ -16,13 +16,11 @@ import (
 	flag "github.com/ogier/pflag"
 )
 
-const (
-	Usage = `
+const usage = `
 Usage: nitro images:pull <host> [registry_host/][username/]<repo_name:tag>
 
   pull image onto a given host
 `
-)
 
 type Response struct {
 	Image images.Image `json:"image"`
@@ -50,15 +48,14 @@ func NewCommand(token string) (cli.Command, error) {
 }
 
 func (c *Command) Help() string {
-	return strings.TrimSpace(Usage)
+	return strings.TrimSpace(usage)
 }
 
 func (c *Command) Run(args []string) int {
 	cmdFlags := flag.NewFlagSet("images:pull", flag.ContinueOnError)
 	cmdFlags.Usage = func() { c.UI.Output(c.Help()) }
 
-	err := cmdFlags.Parse(args)
-	if err != nil {
+	if err := cmdFlags.Parse(args); err != nil {
 		return 1
 	}
 
@@ -96,13 +93,13 @@ func (c *Command) pullImage(host, image string, out io.Writer, termFd uintptr) e
 	if err != nil {
 		return fmt.Errorf("failed to pull image: %s", err)
 	}
+	defer resp.Body.Close()
+
 	if err := httpclient.CheckResponse(resp, http.StatusOK); err != nil {
 		return fmt.Errorf("unexpected response: %s", err)
 	}
-	defer resp.Body.Close()
 
-	err = images.DisplayJSONMessagesStream(resp.Body, out, termFd, true)
-	if err != nil {
+	if err := images.DisplayJSONMessagesStream(resp.Body, out, termFd, true); err != nil {
 		return fmt.Errorf("failed to display download progress: %s", err)
 	}
 	return nil

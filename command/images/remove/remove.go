@@ -11,18 +11,17 @@ import (
 	flag "github.com/ogier/pflag"
 )
 
-const (
-	forceUsage = "Skip confirmation"
-	Usage      = `
+const yesUsage = "Skip confirmation"
+
+var usage = fmt.Sprintf(`
 Usage: nitro images:remove <host> <image id or name[:tag]>
 
   remove image on a given host
 
 Options:
 
-  -f, --force=""    %s
-`
-)
+  -y, --yes=false    %s
+`, yesUsage)
 
 type Command struct {
 	UI     command.UI
@@ -43,14 +42,14 @@ func NewCommand(token string) (cli.Command, error) {
 }
 
 func (c *Command) Help() string {
-	return strings.TrimSpace(fmt.Sprintf(Usage, forceUsage))
+	return strings.TrimSpace(usage)
 }
 
 func (c *Command) Run(args []string) int {
-	var force bool
+	var assumeYes bool
 	cmdFlags := flag.NewFlagSet("images:remove", flag.ContinueOnError)
 	cmdFlags.Usage = func() { c.UI.Output(c.Help()) }
-	cmdFlags.BoolVarP(&force, "force", "f", false, forceUsage)
+	cmdFlags.BoolVarP(&assumeYes, "yes", "y", false, yesUsage)
 
 	err := cmdFlags.Parse(args)
 	if err != nil {
@@ -65,7 +64,7 @@ func (c *Command) Run(args []string) int {
 
 	host, image := args[0], args[1]
 
-	if !force {
+	if !assumeYes {
 		confirmation := c.UI.Confirm(fmt.Sprintf("Do you really want to remove image '%s' from '%s'? [y/N]", image, host))
 		switch confirmation {
 		case command.ConfirmYes:
@@ -77,7 +76,7 @@ func (c *Command) Run(args []string) int {
 			c.UI.Error("Cancelled.")
 			return 130
 		case command.ConfirmErr:
-			c.UI.Error(fmt.Sprintf("An unexpected error has occurred: %v", err))
+			c.UI.Error("An unexpected error has occurred.")
 			return 1
 		}
 	}

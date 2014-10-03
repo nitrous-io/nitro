@@ -63,7 +63,7 @@ var _ = Describe("keys/remove", func() {
 
 	Context("nitro keys:remove containerslug fingerprint", func() {
 		doCmd := func() int {
-			return cmd.Run([]string{"gregarious-scribe-24", "fprint", "--force"})
+			return cmd.Run([]string{"gregarious-scribe-24", "fprint", "--yes"})
 		}
 
 		Context("successful removal of key", func() {
@@ -92,7 +92,7 @@ var _ = Describe("keys/remove", func() {
 			})
 		})
 
-		Context("when --force option is not specified", func() {
+		Context("when --yes option is not specified", func() {
 			doCmd := func() int {
 				return cmd.Run([]string{"gregarious-scribe-24", "fprint"})
 			}

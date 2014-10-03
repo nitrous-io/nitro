@@ -13,18 +13,17 @@ import (
 	flag "github.com/ogier/pflag"
 )
 
-const (
-	forceUsage = "Skip confirmation"
-	usage      = `
+const yesUsage = "Skip confirmation"
+
+var usage = fmt.Sprintf(`
 Usage: nitro keys:remove <container> <md5_fingerprint>
 
   remove a public key
 
 Options:
 
-  -f, --force=""    %s
-`
-)
+  -y, --yes=false    %s
+`, yesUsage)
 
 type Command struct {
 	UI     command.UI
@@ -45,14 +44,14 @@ func RemoveCommand(token string) (cli.Command, error) {
 }
 
 func (c *Command) Help() string {
-	return strings.TrimSpace(fmt.Sprintf(usage, forceUsage))
+	return strings.TrimSpace(usage)
 }
 
 func (c *Command) Run(args []string) int {
-	var force bool
+	var assumeYes bool
 	cmdFlags := flag.NewFlagSet("keys:remove", flag.ContinueOnError)
 	cmdFlags.Usage = func() { c.UI.Output(c.Help()) }
-	cmdFlags.BoolVarP(&force, "force", "f", false, forceUsage)
+	cmdFlags.BoolVarP(&assumeYes, "yes", "y", false, yesUsage)
 
 	err := cmdFlags.Parse(args)
 	if err != nil {
@@ -67,7 +66,7 @@ func (c *Command) Run(args []string) int {
 	container := args[0]
 	fingerprint := args[1]
 
-	if !force {
+	if !assumeYes {
 		confirmation := c.UI.Confirm(fmt.Sprintf("Do you really want to remove this key from '%s'? [y/N]", container))
 		switch confirmation {
 		case command.ConfirmYes:
@@ -79,7 +78,7 @@ func (c *Command) Run(args []string) int {
 			c.UI.Error("Cancelled.")
 			return 130
 		case command.ConfirmErr:
-			c.UI.Error(fmt.Sprintf("An unexpected error has occurred: %v", err))
+			c.UI.Error("An unexpected error has occurred.")
 			return 1
 		}
 	}

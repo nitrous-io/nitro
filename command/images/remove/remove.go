@@ -76,7 +76,7 @@ func (c *Command) Run(args []string) int {
 			c.UI.Error("Cancelled.")
 			return 130
 		case command.ConfirmErr:
-			c.UI.Error(fmt.Sprintf("An unexpected error has occurred: %v", err))
+			c.UI.Error("An unexpected error has occurred.")
 			return 1
 		}
 	}

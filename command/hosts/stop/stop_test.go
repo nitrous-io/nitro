@@ -60,7 +60,7 @@ var _ = Describe("hosts/stop", func() {
 
 	Context("nitro hosts:stop slug", func() {
 		doCmd := func() int {
-			return cmd.Run([]string{"foo-host-42", "--force"})
+			return cmd.Run([]string{"foo-host-42", "--yes"})
 		}
 
 		Context("when host is successfully stopped", func() {
@@ -75,7 +75,7 @@ var _ = Describe("hosts/stop", func() {
 				Expect(code).To(Equal(0))
 			})
 
-			Context("when --force option is not specified", func() {
+			Context("when --yes option is not specified", func() {
 				doCmd := func() int {
 					return cmd.Run([]string{"foo-host-42"})
 				}

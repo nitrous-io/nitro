@@ -13,18 +13,17 @@ import (
 	flag "github.com/ogier/pflag"
 )
 
-const (
-	forceUsage = "Skip confirmation"
-	usage      = `
+const yesUsage = "Skip confirmation"
+
+var usage = fmt.Sprintf(`
 Usage: nitro volumes:remove <host> <volume_slug>
 
   remove a data volume from a host
 
 Options:
 
-  -f, --force=""    %s
-`
-)
+  -y, --yes=false    %s
+`, yesUsage)
 
 type Command struct {
 	UI     command.UI
@@ -45,17 +44,16 @@ func RemoveCommand(token string) (cli.Command, error) {
 }
 
 func (c *Command) Help() string {
-	return strings.TrimSpace(fmt.Sprintf(usage, forceUsage))
+	return strings.TrimSpace(usage)
 }
 
 func (c *Command) Run(args []string) int {
-	var force bool
+	var assumeYes bool
 	cmdFlags := flag.NewFlagSet("volumes:remove", flag.ContinueOnError)
 	cmdFlags.Usage = func() { c.UI.Output(c.Help()) }
-	cmdFlags.BoolVarP(&force, "force", "f", false, forceUsage)
+	cmdFlags.BoolVarP(&assumeYes, "yes", "y", false, yesUsage)
 
-	err := cmdFlags.Parse(args)
-	if err != nil {
+	if err := cmdFlags.Parse(args); err != nil {
 		return 1
 	}
 	args = cmdFlags.Args()
@@ -67,7 +65,7 @@ func (c *Command) Run(args []string) int {
 	hostSlug := args[0]
 	volSlug := args[1]
 
-	if !force {
+	if !assumeYes {
 		c.UI.Output("WARNING: All files in data volume will be removed!")
 		confirmation := c.UI.Confirm(fmt.Sprintf("Do you really want to remove volume '%s' from '%s'? [y/N]", volSlug, hostSlug))
 		switch confirmation {
@@ -80,13 +78,12 @@ func (c *Command) Run(args []string) int {
 			c.UI.Error("Cancelled.")
 			return 130
 		case command.ConfirmErr:
-			c.UI.Error(fmt.Sprintf("An unexpected error has occurred: %v", err))
+			c.UI.Error("An unexpected error has occurred.")
 			return 1
 		}
 	}
 
-	err = c.makeRequest(hostSlug, volSlug)
-	if err != nil {
+	if err := c.makeRequest(hostSlug, volSlug); err != nil {
 		c.UI.Error(err.Error())
 		return 1
 	}

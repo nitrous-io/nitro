@@ -11,17 +11,17 @@ import (
 	flag "github.com/ogier/pflag"
 )
 
-const forceUsage = "Skip confirmation"
+const yesUsage = "Skip confirmation"
 
-const usage = `
+var usage = fmt.Sprintf(`
 Usage: nitro restart <slug>
 
   restart a host
 
 Options:
 
-  -f, --force=""    %s
-`
+  -y, --yes=false    %s
+`, yesUsage)
 
 type Command struct {
 	UI     command.UI
@@ -42,11 +42,11 @@ func NewCommand(token string) (cli.Command, error) {
 }
 
 func (c *Command) Run(args []string) int {
-	var force bool
+	var assumeYes bool
 
 	cmdFlags := flag.NewFlagSet("hosts:restart", flag.ContinueOnError)
 	cmdFlags.Usage = func() { c.UI.Output(c.Help()) }
-	cmdFlags.BoolVarP(&force, "force", "f", false, forceUsage)
+	cmdFlags.BoolVarP(&assumeYes, "yes", "y", false, yesUsage)
 
 	err := cmdFlags.Parse(args)
 	if err != nil {
@@ -61,7 +61,7 @@ func (c *Command) Run(args []string) int {
 
 	slug := args[0]
 
-	if !force {
+	if !assumeYes {
 		confirmation := c.UI.Confirm(fmt.Sprintf("Do you really want to restart '%s'? [y/N]", slug))
 		switch confirmation {
 		case command.ConfirmYes:
@@ -90,7 +90,7 @@ func (c *Command) Run(args []string) int {
 }
 
 func (c *Command) Help() string {
-	return strings.TrimSpace(fmt.Sprintf(usage, forceUsage))
+	return strings.TrimSpace(usage)
 }
 
 func (c *Command) Synopsis() string {

@@ -63,7 +63,7 @@ var _ = Describe("volumes/remove", func() {
 
 	Context("nitro volumes:remove host volume", func() {
 		doCmd := func() int {
-			return cmd.Run([]string{"myhost", "dotfiles", "--force"})
+			return cmd.Run([]string{"myhost", "dotfiles", "--yes"})
 		}
 
 		Context("successful removal of volume", func() {
@@ -92,7 +92,7 @@ var _ = Describe("volumes/remove", func() {
 			})
 		})
 
-		Context("when --force option is not specified", func() {
+		Context("when --yes option is not specified", func() {
 			doCmd := func() int {
 				return cmd.Run([]string{"myhost", "dotfiles"})
 			}

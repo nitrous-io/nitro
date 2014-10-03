@@ -56,7 +56,7 @@ var _ = Describe("images/remove", func() {
 
 	Context("nitro images:remove host image", func() {
 		doCmd := func() int {
-			return cmd.Run([]string{"myhost", "nitrousio/ubuntu", "--force"})
+			return cmd.Run([]string{"myhost", "nitrousio/ubuntu", "--yes"})
 		}
 
 		Context("successful removal of image", func() {
@@ -85,7 +85,7 @@ var _ = Describe("images/remove", func() {
 			})
 		})
 
-		Context("when --force option is not specified", func() {
+		Context("when --yes option is not specified", func() {
 			doCmd := func() int {
 				return cmd.Run([]string{"myhost", "nitrousio/ubuntu"})
 			}

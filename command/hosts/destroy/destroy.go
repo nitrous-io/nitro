@@ -11,17 +11,17 @@ import (
 	flag "github.com/ogier/pflag"
 )
 
-const forceUsage = "Skip confirmation"
+const yesUsage = "Skip confirmation"
 
-const usage = `
+var usage = fmt.Sprintf(`
 Usage: nitro hosts:destroy <slug>
 
   destroy host with the given slug
 
 Options:
 
-  -f, --force=""    %s
-`
+  -y, --yes=false    %s
+`, yesUsage)
 
 type Command struct {
 	UI     command.UI
@@ -46,14 +46,13 @@ func (c *Command) Help() string {
 }
 
 func (c *Command) Run(args []string) int {
-	var force bool
+	var assumeYes bool
 
 	cmdFlags := flag.NewFlagSet("hosts:destroy", flag.ContinueOnError)
 	cmdFlags.Usage = func() { c.UI.Output(c.Help()) }
-	cmdFlags.BoolVarP(&force, "force", "f", false, forceUsage)
+	cmdFlags.BoolVarP(&assumeYes, "yes", "y", false, yesUsage)
 
-	err := cmdFlags.Parse(args)
-	if err != nil {
+	if err := cmdFlags.Parse(args); err != nil {
 		return 1
 	}
 	args = cmdFlags.Args()
@@ -64,7 +63,7 @@ func (c *Command) Run(args []string) int {
 
 	slug := args[0]
 
-	if !force {
+	if !assumeYes {
 		confirmation := c.UI.Confirm(fmt.Sprintf("Do you really want to destroy '%s'? [y/N]", slug))
 		switch confirmation {
 		case command.ConfirmYes:
@@ -82,8 +81,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	c.UI.Output(fmt.Sprintf("Destroying host %s...", slug))
-	err = c.destroyHost(slug)
-	if err != nil {
+	if err := c.destroyHost(slug); err != nil {
 		c.UI.Error(fmt.Sprintf("Failed to destroy host - %v", err.Error()))
 		return 1
 	}

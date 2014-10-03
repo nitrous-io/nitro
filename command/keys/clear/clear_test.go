@@ -64,7 +64,7 @@ var _ = Describe("keys/clear", func() {
 
 	Context("nitro keys:clear containerslug", func() {
 		doCmd := func() int {
-			return cmd.Run([]string{"gregarious-scribe-24", "--force"})
+			return cmd.Run([]string{"gregarious-scribe-24", "--yes"})
 		}
 
 		Context("successful clearing of keys", func() {
@@ -106,7 +106,7 @@ var _ = Describe("keys/clear", func() {
 			})
 		})
 
-		Context("when --force option is not specified", func() {
+		Context("when --yes option is not specified", func() {
 			doCmd := func() int {
 				return cmd.Run([]string{"gregarious-scribe-24"})
 			}

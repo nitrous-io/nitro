@@ -71,7 +71,7 @@ var _ = Describe("hosts/destroy", func() {
 		})
 
 		doCmd := func() int {
-			return cmd.Run([]string{"foo", "--force"})
+			return cmd.Run([]string{"foo", "--yes"})
 		}
 
 		It("reports success", func() {
@@ -80,7 +80,7 @@ var _ = Describe("hosts/destroy", func() {
 			Expect(code).To(Equal(0))
 		})
 
-		Context("when --force option is not specified", func() {
+		Context("when --yes option is not specified", func() {
 			doCmd := func() int {
 				return cmd.Run([]string{"foo"})
 			}
@@ -106,7 +106,7 @@ var _ = Describe("hosts/destroy", func() {
 		})
 
 		It("displays error message", func() {
-			code := cmd.Run([]string{"foo", "--force"})
+			code := cmd.Run([]string{"foo", "--yes"})
 			Expect(ui.ErrorWriter.String()).To(ContainSubstring("host not found"))
 			Expect(code).To(Equal(1))
 		})

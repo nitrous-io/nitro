@@ -69,7 +69,7 @@ var _ = Describe("containers/destroy", func() {
 
 	Context("nitro destroy containerslug", func() {
 		doCmd := func() int {
-			return cmd.Run([]string{"gregarious-scribe-24", "--force"})
+			return cmd.Run([]string{"gregarious-scribe-24", "--yes"})
 		}
 
 		Context("when the API responds with the container", func() {
@@ -87,7 +87,7 @@ gregarious-scribe-24    ubuntu
 				Expect(code).To(Equal(0))
 			})
 
-			Context("when --force option is not specified", func() {
+			Context("when --yes option is not specified", func() {
 				doCmd := func() int {
 					return cmd.Run([]string{"gregarious-scribe-24"})
 				}

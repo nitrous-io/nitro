@@ -4,17 +4,25 @@ import (
 	"archive/tar"
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"log"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/docker/docker/pkg/archive"
 	"github.com/mitchellh/cli"
 	"github.com/nitrous-io/nitro/command"
 	"github.com/nitrous-io/nitro/command/images"
+	"github.com/nitrous-io/nitro/pkg/buildcontext"
 	"github.com/nitrous-io/nitro/pkg/randomnamegenerator"
 	"github.com/nitrous-io/nitrous-common/httpclient"
 	"github.com/nitrous-io/nitrous-common/isarchive"
@@ -101,89 +109,181 @@ func (c *Command) Synopsis() string {
 }
 
 func (c *Command) buildImage(host, fpath, slug string, out io.Writer, termFd uintptr) error {
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
+	var err error
+	var body io.Reader
 
-	r, err := loadFile(fpath)
+	contentType := "application/x-www-form-urlencoded"
+	params := url.Values{
+		"slug": []string{slug},
+	}
+
+	// check if the given path is available locally
+	st, err := os.Stat(fpath)
+	if err == nil {
+		var r io.Reader
+		if st.IsDir() {
+			if r, err = wrapBuildContext(fpath); err != nil {
+				return err
+			}
+		} else {
+			f, err := os.Open(fpath)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			if r, err = ensureArchive(f); err != nil {
+				return err
+			}
+		}
+
+		var pw *io.PipeWriter
+		body, pw = io.Pipe()
+		writer := multipart.NewWriter(pw)
+		// override the default content-type
+		contentType = writer.FormDataContentType()
+
+		go func() {
+			defer pw.Close()
+			errCh := uploadBuildContext(writer, params, r)
+			if err := <-errCh; err != nil {
+				log.Printf(err.Error())
+			}
+			return
+		}()
+	} else if isRemoteURL(fpath) {
+		params.Set("remote", fpath)
+		body = bytes.NewBufferString(params.Encode())
+	} else {
+		return errors.New("path is invalid - requires a path to a local file/directory or a remote URL")
+	}
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/v0/hosts/%s/images", c.Server, host), body)
 	if err != nil {
 		return err
 	}
-
-	part, err := writer.CreateFormFile("file", "buildcontext.tar")
-	if err != nil {
-		return err
-	}
-	if _, err := io.Copy(part, r); err != nil {
-		return err
-	}
-	if err := writer.WriteField("slug", slug); err != nil {
-		return err
-	}
-	if err := writer.Close(); err != nil {
-		return err
-	}
-
-	path := fmt.Sprintf("%s/api/v0/hosts/%s/images", c.Server, host)
-	req, err := http.NewRequest("POST", path, body)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Content-Type", contentType)
 	resp, err := c.Client.DoAuthed(req)
 	if err != nil {
 		return err
 	}
-	if err := httpclient.CheckResponse(resp, http.StatusOK); err != nil {
+	if err = httpclient.CheckResponse(resp, http.StatusOK); err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
-	if err := images.DisplayJSONMessagesStream(resp.Body, out, termFd, true); err != nil {
+	if err = images.DisplayJSONMessagesStream(resp.Body, out, termFd, true); err != nil {
 		return fmt.Errorf("failed to display build progress: %s", err)
 	}
 	return nil
 }
 
-// loadFile returns a reader to path if path is a tarball,
-// or wraps path in a tarball if path is a Dockerfile
-func loadFile(fpath string) (io.Reader, error) {
-	f, err := os.Open(fpath)
+func uploadBuildContext(writer *multipart.Writer, params url.Values, in io.Reader) chan error {
+	errChan := make(chan error, 1)
+
+	for k, v := range params {
+		if err := writer.WriteField(k, v[0]); err != nil {
+			errChan <- err
+			return errChan
+		}
+	}
+
+	part, err := writer.CreateFormFile("file", "buildcontext.tar")
 	if err != nil {
+		errChan <- err
+		return errChan
+	}
+	if _, err := io.Copy(part, in); err != nil {
+		errChan <- err
+		return errChan
+	}
+
+	errChan <- writer.Close()
+	return errChan
+}
+
+func isRemoteURL(s string) bool {
+	return strings.HasPrefix(s, "http://") ||
+		strings.HasPrefix(s, "https://") ||
+		strings.HasPrefix(s, "git://") ||
+		strings.HasPrefix(s, "git@") ||
+		strings.HasPrefix(s, "github.com/") ||
+		strings.HasSuffix(s, ".git")
+}
+
+// wrapBuildContext will traverse the directory and create a tarball containing its files
+func wrapBuildContext(src string) (io.Reader, error) {
+	filename := path.Join(src, "Dockerfile")
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		return nil, fmt.Errorf("wrap build context: no Dockerfile found in %s", src)
+	}
+
+	var excludes []string
+	ignore, err := ioutil.ReadFile(path.Join(src, ".dockerignore"))
+	if err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("wrap build context: error reading .dockerignore: '%s'", err)
+	}
+	for _, pattern := range strings.Split(string(ignore), "\n") {
+		ok, err := filepath.Match(pattern, "Dockerfile")
+		if err != nil {
+			return nil, fmt.Errorf("wrap build context: bad .dockerignore pattern: '%s', error: %s", pattern, err)
+		}
+		if ok {
+			return nil, fmt.Errorf("wrap build context: dockerfile was excluded by .dockerignore pattern '%s'", pattern)
+		}
+		excludes = append(excludes, pattern)
+	}
+
+	// check if a given context directory is valid
+	// ie. has permission to access all children
+	if err := buildcontext.ValidateDirectory(src, excludes); err != nil {
 		return nil, err
 	}
-	defer f.Close()
 
+	// create tar with options
+	return archive.TarWithOptions(src, &archive.TarOptions{
+		Compression: archive.Uncompressed,
+		Excludes:    excludes,
+	})
+}
+
+// ensureArchive returns a reader to path if path is a tarball,
+// or wraps path in a tarball if path is to a Dockerfile
+func ensureArchive(f *os.File) (io.Reader, error) {
 	bufRdr := bufio.NewReader(f)
 	header, err := bufRdr.Peek(isarchive.MaxHeaderLength)
 	// Peek can return err even if header is read and read bytes is shorter than requested
 	if err != nil && header == nil {
 		return nil, err
 	}
-	isArchive := isarchive.IsArchive(header)
+	if isarchive.IsArchive(header) {
+		return bufRdr, nil
+	} else if filepath.Base(f.Name()) == "Dockerfile" {
+		return makeArchiveFromDockerfile(f)
+	}
 
-	b := &bytes.Buffer{}
-	_, err = b.ReadFrom(bufRdr)
+	return nil, fmt.Errorf("provided file should be a Dockerfile or a valid archive")
+}
+
+// takes a buffered Dockerfile and returns a tar Reader
+func makeArchiveFromDockerfile(dockerfile *os.File) (io.Reader, error) {
+	stat, err := dockerfile.Stat()
 	if err != nil {
 		return nil, err
 	}
 
-	// if not archive, make tarball
-	if !isArchive {
-		return makeArchive(b)
+	// reset the file to read from beginning
+	_, err = dockerfile.Seek(0, os.SEEK_SET)
+	if err != nil {
+		return nil, err
 	}
 
-	return b, nil
-}
-
-// takes a buffered Dockerfile and returns a tar Reader
-func makeArchive(dockerfileBuf *bytes.Buffer) (io.Reader, error) {
 	buf := bytes.NewBuffer(nil)
 	tw := tar.NewWriter(buf)
 
 	now := time.Now()
 	hdr := &tar.Header{
 		Name:       "Dockerfile",
-		Size:       int64(dockerfileBuf.Len()),
+		Size:       stat.Size(),
 		ModTime:    now,
 		AccessTime: now,
 		ChangeTime: now,
@@ -191,24 +291,11 @@ func makeArchive(dockerfileBuf *bytes.Buffer) (io.Reader, error) {
 	if err := tw.WriteHeader(hdr); err != nil {
 		return nil, err
 	}
-	if _, err := tw.Write(dockerfileBuf.Bytes()); err != nil {
+	if _, err := io.Copy(tw, dockerfile); err != nil {
 		return nil, err
 	}
 	if err := tw.Close(); err != nil {
 		return nil, err
 	}
 	return buf, nil
-}
-
-func isValidTar(r io.Reader) bool {
-	tr := tar.NewReader(r)
-	for {
-		hdr, err := tr.Next()
-		if err != nil {
-			return false
-		}
-		if hdr.Name == "Dockerfile" || hdr.Name == "./Dockerfile" {
-			return true
-		}
-	}
 }

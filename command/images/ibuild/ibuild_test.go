@@ -1,8 +1,10 @@
 package ibuild_test
 
 import (
+	"archive/tar"
 	"bufio"
 	"bytes"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -40,6 +42,7 @@ var _ = Describe("images/ibuild", func() {
 		dfBytes      = []byte("FROM scratch")
 	)
 
+	// creates and closes tmp file, returns filename, caller to remove file
 	makeDockerfile := func(dfPath string) string {
 		if dfPath == "" {
 			dfPath = path.Join(tmpdir, "Dockerfile")
@@ -51,8 +54,6 @@ var _ = Describe("images/ibuild", func() {
 
 	// creates and closes tmp file, returns filename, caller to remove file
 	makeTar := func(compress bool) string {
-		// building a tar with Go here would be replicating dockerfileTar, so
-		// use tar command to build
 		f, err := ioutil.TempFile(tmpdir, "build-valid-tar")
 		Expect(err).To(BeNil())
 		f.Close()
@@ -67,6 +68,35 @@ var _ = Describe("images/ibuild", func() {
 		err = cmd.Run()
 		Expect(err).To(BeNil())
 		return f.Name()
+	}
+
+	// creates and returns directory, caller to remove directory
+	makeDir := func() string {
+		dir := path.Join(tmpdir, "scratch")
+		err := os.Mkdir(dir, 0777)
+		Expect(err).To(BeNil())
+
+		// add a Dockerfile
+		makeDockerfile(path.Join(dir, "Dockerfile"))
+
+		// add a sub-directory
+		subdir := path.Join(dir, "sub")
+		err = os.Mkdir(subdir, 0777)
+		Expect(err).To(BeNil())
+
+		// add a file inside subdirectory
+		err = ioutil.WriteFile(path.Join(subdir, "hello.txt"), []byte("hello world"), 0600)
+		Expect(err).To(BeNil())
+
+		// add a file to ignore
+		err = ioutil.WriteFile(path.Join(subdir, "ignoreme"), []byte("hello"), 0600)
+		Expect(err).To(BeNil())
+
+		// add a .dockerignore file
+		err = ioutil.WriteFile(path.Join(dir, ".dockerignore"), []byte("sub/ignoreme"), 0600)
+		Expect(err).To(BeNil())
+
+		return dir
 	}
 
 	BeforeEach(func() {
@@ -84,16 +114,18 @@ var _ = Describe("images/ibuild", func() {
 				}
 			},
 			func(w http.ResponseWriter, req *http.Request) {
-				// check that request always sends a tarball
-				// in 'file' param
-				f, _, err := req.FormFile("file")
-				Expect(err).To(BeNil())
-				defer f.Close()
+				// if a remote param is not set,
+				// a file param containing a tarball is required.
+				if req.FormValue("remote") == "" {
+					f, _, err := req.FormFile("file")
+					Expect(err).To(BeNil())
+					defer f.Close()
 
-				bufRdr := bufio.NewReader(f)
-				header, _ := bufRdr.Peek(isarchive.MaxHeaderLength)
-				Expect(header).NotTo(BeNil())
-				Expect(isarchive.IsArchive(header)).To(BeTrue())
+					bufRdr := bufio.NewReader(f)
+					header, _ := bufRdr.Peek(isarchive.MaxHeaderLength)
+					Expect(header).NotTo(BeNil())
+					Expect(isarchive.IsArchive(header)).To(BeTrue())
+				}
 			},
 			ghttp.VerifyHeaderKV("Authorization", "Bearer correct_token"),
 			ghttp.VerifyRequest("POST", "/api/v0/hosts/myhost/images"),
@@ -130,7 +162,7 @@ var _ = Describe("images/ibuild", func() {
 			return cmd.Run([]string{"myhost", fpath})
 		}
 
-		Context("successful build with Dockerfile", func() {
+		Context("different valid paths", func() {
 			BeforeEach(func() {
 				statusCode = http.StatusOK
 				responseBody = `
@@ -147,7 +179,7 @@ var _ = Describe("images/ibuild", func() {
 			    `
 			})
 
-			It("uploads Dockerfile inside tar", func() {
+			It("accepts and uploads a plain Dockerfile as a tar", func() {
 				fpath := makeDockerfile("")
 				code := doCmd(fpath)
 				Expect(code).To(Equal(0))
@@ -159,26 +191,8 @@ var _ = Describe("images/ibuild", func() {
 
 				Expect(string(output)).To(ContainSubstring("Built image"))
 			})
-		})
 
-		Context("successful build with tarball", func() {
-			BeforeEach(func() {
-				statusCode = http.StatusOK
-				responseBody = `
-					{"stream":"Step 0 : FROM ubuntu:latest\n"}
-					{"stream":" ---\u003e 4300eb9d3c8d\n"}
-					{"stream":"Step 1 : MAINTAINER docker <eng@docker.com>\n"}
-					{"stream":" ---\u003e Using cache\n"}
-					{"stream":" ---\u003e 3a3ed758c370\n"}
-					{"stream":"Step 2 : CMD /usr/bin/top\n"}
-					{"stream":" ---\u003e Running in 36b1479cc2e4\n"}
-					{"stream":" ---\u003e 4b6188aebe39\n"}
-					{"stream":"Removing intermediate container 36b1479cc2e4\n"}
-					{"stream":"Successfully built 4b6188aebe39\n"}
-			    `
-			})
-
-			It("uploads compressed tarball", func() {
+			It("accepts and uploads a compressed tarball", func() {
 				fpath := makeTar(true)
 				code := doCmd(fpath)
 				Expect(srv.ReceivedRequests()).To(HaveLen(1))
@@ -187,13 +201,69 @@ var _ = Describe("images/ibuild", func() {
 				Expect(string(output)).To(ContainSubstring("Built image"))
 			})
 
-			It("uploads uncompressed tarball", func() {
+			It("accepts and uploads uncompressed tarball", func() {
 				fpath := makeTar(false)
 				code := doCmd(fpath)
 				Expect(srv.ReceivedRequests()).To(HaveLen(1))
 				output, _ := ioutil.ReadFile(outfile.Name())
 				Expect(code).To(Equal(0))
 				Expect(string(output)).To(ContainSubstring("Built image"))
+			})
+
+			It("accepts a directory with a Dockerfile, creates and uploads it as a tar", func() {
+				fpath := makeDir()
+				code := doCmd(fpath)
+				reqs := srv.ReceivedRequests()
+				Expect(reqs).To(HaveLen(1))
+
+				f, _, err := reqs[0].FormFile("file")
+				Expect(err).To(BeNil())
+				defer f.Close()
+
+				tr := tar.NewReader(f)
+
+				expectedPaths := []string{
+					"./",
+					"Dockerfile",
+					".dockerignore",
+					"sub/",
+					"sub/hello.txt",
+				}
+				for {
+					hdr, err := tr.Next()
+					if err == io.EOF {
+						break
+					}
+					Expect(err).To(BeNil())
+					Expect(expectedPaths).To(ContainElement(hdr.Name))
+				}
+
+				output, _ := ioutil.ReadFile(outfile.Name())
+				Expect(code).To(Equal(0))
+				Expect(string(output)).To(ContainSubstring("Built image"))
+			})
+
+			Context("when given path is a valid URL", func() {
+				for _, t := range []string{
+					"https://github.com/nitrous-io/docker-hello.git",
+					"git://github.com/nitrous-io/docker-hello",
+					"git@github.com:nitrous-io/docker-hello",
+					"http://pastebin.com/raw.php?i=some-dockerfile",
+					"github.com/nitrous-io/docker-hello",
+					"user@bitbucket.org/nitrous-io/docker-hello.git",
+				} {
+					url := t
+					It("makes the request with URL set in remote param "+url, func() {
+						code := doCmd(url)
+						reqs := srv.ReceivedRequests()
+						Expect(reqs).To(HaveLen(1))
+						Expect(reqs[0].FormValue("remote")).To(Equal(url))
+
+						output, _ := ioutil.ReadFile(outfile.Name())
+						Expect(code).To(Equal(0))
+						Expect(string(output)).To(ContainSubstring("Built image"))
+					})
+				}
 			})
 		})
 
@@ -230,7 +300,7 @@ var _ = Describe("images/ibuild", func() {
 				code := doCmd("/tmp/nosuch")
 				Expect(code).To(Equal(1))
 				Expect(srv.ReceivedRequests()).To(HaveLen(0))
-				Expect(errorWriter.String()).To(ContainSubstring("no such file or directory"))
+				Expect(errorWriter.String()).To(ContainSubstring("path is invalid"))
 			})
 		})
 
@@ -272,5 +342,4 @@ var _ = Describe("images/ibuild", func() {
 			Expect(cmd.Help()).To(ContainSubstring("Usage: nitro images:build"))
 		})
 	})
-
 })

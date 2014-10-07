@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -x
+set -e
+
+APP=${1:?"app name is required"}
+VERSION=${2:?"version is required"}
+ENV=${3:?"env is required"}
+
+ARTIFACT_DIR=/tmp/$APP/$VERSION/$ENV/windows/amd64
+
+if [[ "$ENV" == "production" ]]; then
+  PACKAGE_NAME=$APP
+else
+  PACKAGE_NAME=${ENV}${APP}
+  mv ${ARTIFACT_DIR}/${APP} ${ARTIFACT_DIR}/${PACKAGE_NAME}
+fi
+
+# WIN package
+WIN_ARCH="windows_amd64"
+WIN_PKG=${PACKAGE_NAME}-${VERSION}-${WIN_ARCH}.zip
+WIN_BUCKET=win.nitrous.io
+
+cd $ARTIFACT_DIR
+zip ${WIN_PKG} ${PACKAGE_NAME}
+
+s3cmd --access_key=$ACCESS_KEY --secret_key=$SECRET_KEY --acl-public put ${ARTIFACT_DIR}/${WIN_PKG} s3://${WIN_BUCKET}/${WIN_PKG}
+s3cmd --access_key=$ACCESS_KEY --secret_key=$SECRET_KEY --acl-public put ${ARTIFACT_DIR}/${WIN_PKG} s3://${WIN_BUCKET}/${PACKAGE_NAME}-latest-${WIN_ARCH}.zip

@@ -8,7 +8,7 @@ export APP=${1:?"app is required"}
 export VERSION=${2:?"version is required"}
 export NITRO_API_URL=${3:-http://127.0.0.1:3333}
 
-ARCHS="linux/amd64 darwin/amd64"
+ARCHS="linux/amd64 darwin/amd64 windows/amd64"
 
 for arch in $ARCHS; do
   export BUILD=$(pwd)/build/$arch

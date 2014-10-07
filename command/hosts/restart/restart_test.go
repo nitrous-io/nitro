@@ -28,7 +28,6 @@ var _ = Describe("hosts/restart", func() {
 		w   *io.PipeWriter
 
 		srv          *ghttp.Server
-		handlers     http.HandlerFunc
 		statusCode   int
 		responseBody string
 	)
@@ -37,13 +36,15 @@ var _ = Describe("hosts/restart", func() {
 		r, w = io.Pipe()
 		ui = &command.MockUI{&cli.MockUi{InputReader: r}}
 
-		handlers = ghttp.CombineHandlers(
+		srv = ghttp.NewServer()
+		srv.AppendHandlers(ghttp.CombineHandlers(
 			ghttp.VerifyHeaderKV("Authorization", "Bearer correct_token"),
 			ghttp.VerifyRequest("POST", "/api/v0/hosts/foo-host-42/restart"),
+			func(w http.ResponseWriter, req *http.Request) {
+				req.ParseForm()
+			},
 			ghttp.RespondWithPtr(&statusCode, &responseBody),
-		)
-		srv = ghttp.NewServer()
-		srv.AppendHandlers(handlers)
+		))
 
 		cmd = &restart.Command{
 			UI:     ui,
@@ -90,6 +91,20 @@ var _ = Describe("hosts/restart", func() {
 					code = doCmd()
 					Expect(ui.OutputWriter.String()).To(ContainSubstring("Done"))
 					Expect(code).To(Equal(0))
+				})
+			})
+
+			Context("when --force option is given", func() {
+				doCmd := func() int {
+					return cmd.Run([]string{"foo-host-42", "--yes", "--force"})
+				}
+
+				It("makes request with param force=true", func() {
+					code := doCmd()
+					Expect(code).To(Equal(0))
+
+					reqs := srv.ReceivedRequests()
+					Expect(reqs[0].PostFormValue("force")).To(Equal("true"))
 				})
 			})
 		})

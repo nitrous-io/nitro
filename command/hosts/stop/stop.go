@@ -3,6 +3,7 @@ package stop
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/mitchellh/cli"
@@ -11,7 +12,10 @@ import (
 	flag "github.com/ogier/pflag"
 )
 
-const yesUsage = "Skip confirmation"
+const (
+	yesUsage   = "Skip confirmation"
+	forceUsage = "Stop host even if it is not running"
+)
 
 var usage = fmt.Sprintf(`
 Usage: nitro stop <slug>
@@ -20,8 +24,9 @@ Usage: nitro stop <slug>
 
 Options:
 
-  -y, --yes=false    %s
-`, yesUsage)
+  -f, --force=false    %s
+  -y, --yes=false      %s
+`, yesUsage, forceUsage)
 
 type Command struct {
 	UI     command.UI
@@ -42,10 +47,11 @@ func NewCommand(token string) (cli.Command, error) {
 }
 
 func (c *Command) Run(args []string) int {
-	var assumeYes bool
+	var force, assumeYes bool
 
 	cmdFlags := flag.NewFlagSet("hosts:stop", flag.ContinueOnError)
 	cmdFlags.Usage = func() { c.UI.Output(c.Help()) }
+	cmdFlags.BoolVarP(&force, "force", "f", false, forceUsage)
 	cmdFlags.BoolVarP(&assumeYes, "yes", "y", false, yesUsage)
 
 	err := cmdFlags.Parse(args)
@@ -79,7 +85,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	c.UI.Output(fmt.Sprintf("Stopping host %s...", slug))
-	err = c.stop(slug)
+	err = c.stop(slug, force)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Failed: %s", err.Error()))
 		return 1
@@ -97,9 +103,13 @@ func (c *Command) Synopsis() string {
 	return "Stop a host"
 }
 
-func (c *Command) stop(slug string) error {
-	url := fmt.Sprintf("%s/api/v0/hosts/%s/stop", c.Server, slug)
-	resp, err := c.Client.PostFormAuthed(url, nil)
+func (c *Command) stop(slug string, force bool) error {
+	u := fmt.Sprintf("%s/api/v0/hosts/%s/stop", c.Server, slug)
+	params := &url.Values{}
+	if force {
+		params.Set("force", "true")
+	}
+	resp, err := c.Client.PostFormAuthed(u, params)
 	if err != nil {
 		return err
 	}

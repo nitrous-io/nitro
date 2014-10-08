@@ -2,6 +2,7 @@ package logs_test
 
 import (
 	"bytes"
+	"io"
 	"strconv"
 
 	"net"
@@ -9,12 +10,14 @@ import (
 
 	"testing"
 
+	"github.com/gorilla/websocket"
 	"github.com/mitchellh/cli"
 	"github.com/nitrous-io/nitro/command"
 	"github.com/nitrous-io/nitro/command/containers/logs"
 	"github.com/nitrous-io/nitro/consts"
 	"github.com/nitrous-io/nitro/test"
 	"github.com/nitrous-io/nitrous-common/httpclient"
+	"github.com/nitrous-io/nitrous-common/wsconn"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
@@ -73,29 +76,42 @@ var _ = Describe("logs", func() {
 
 		// Setup handlers for freighter which nitro
 		// will be querying to get the log stream
-		fhandlers := ghttp.CombineHandlers(
-			ghttp.VerifyHeaderKV("Authorization", "Token container-token"),
-			ghttp.VerifyRequest(
-				"GET",
-				"/containers/deadbeef/logs",
-				"follow=false&tail=all&timestamps=false"),
-			ghttp.RespondWithPtr(&fStatusCode, &fResponseBody),
-		)
-		fsrv = ghttp.NewTLSServer()
+		fsrv = ghttp.NewServer()
 		var err error
 		fsrv.HTTPTestServer, err = test.NewTLSServer(fsrv, test.SampleHostname, []byte(consts.CACert))
 		Expect(err).To(BeNil())
-		fsrv.AppendHandlers(fhandlers)
+		// Setup handlers: attach to container.
+		fsrv.AppendHandlers(ghttp.CombineHandlers(
+			ghttp.VerifyRequest(
+				"GET",
+				"/containers/deadbeef/logs",
+				"follow=false&tail=all&timestamps=false&token=container-token"),
+			func(w http.ResponseWriter, r *http.Request) {
+				upgrader := websocket.Upgrader{ReadBufferSize: 1024, WriteBufferSize: 1024}
+				conn, err := upgrader.Upgrade(w, r, nil)
+				Expect(err).To(BeNil())
+				stream := wsconn.NewConnection(conn)
+				defer stream.Close()
 
-		stdout = bytes.NewBuffer(nil)
+				stream.Write([]byte("d|hello im a log"))
+				// Write a heartbeat message to see if it is ignored
+				stream.Write([]byte("h"))
+				// Send a close message
+				stream.Write([]byte("c|connection closed"))
+			},
+		))
+
+		tlsConf, err := command.ClientConfig(test.SampleHostname)
+		Expect(err).To(BeNil(), "failed to generate client tls config")
 
 		cmd = &logs.Command{
 			UI: &command.BasicUI{cli.BasicUi{
 				Writer:      stdout,
 				ErrorWriter: bytes.NewBuffer(nil),
 			}},
-			Server: nsrv.URL(),
-			Client: httpclient.New("correct_token"),
+			Server:    nsrv.URL(),
+			Client:    httpclient.New("correct_token"),
+			TLSConfig: tlsConf,
 		}
 	})
 
@@ -132,15 +148,52 @@ var _ = Describe("logs", func() {
 			fResponseBody = "hello im a log"
 		})
 
-		It("get logs of the container", func() {
-			code := cmd.Run([]string{"foo-container-42"})
-			Expect(code).To(Equal(0))
-			Expect(stdout.String()).To(Equal("hello im a log"))
+		It("get logs of the container", func(done Done) {
+			tlsConf, err := command.ClientConfig(test.SampleHostname)
+			Expect(err).To(BeNil(), "failed to generate client tls config")
+
+			stdoutReader, stdout := io.Pipe()
+			cmd = &logs.Command{
+				UI: &command.BasicUI{cli.BasicUi{
+					Writer:      stdout,
+					ErrorWriter: bytes.NewBuffer(nil),
+				}},
+				Server:    nsrv.URL(),
+				Client:    httpclient.New("correct_token"),
+				TLSConfig: tlsConf,
+			}
+
+			exited := make(chan struct{})
+			go func() {
+				cmd.Run([]string{"foo-container-42"})
+				close(exited)
+			}()
+
+			b := make([]byte, len("hello im a log"))
+			_, err = stdoutReader.Read(b)
+			Expect(err).To(BeNil())
+			Expect(string(b)).To(Equal("hello im a log"))
+
+			// Close pipe so that the command will exit.
+			stdout.Close()
+			stdoutReader.Close()
+
+			<-exited
+			close(done)
 		})
 	})
 
 	Context("without providing container slug", func() {
 		It("requires container slug", func() {
+			cmd = &logs.Command{
+				UI: &command.BasicUI{cli.BasicUi{
+					Writer:      bytes.NewBuffer(nil),
+					ErrorWriter: bytes.NewBuffer(nil),
+				}},
+				Server: nsrv.URL(),
+				Client: httpclient.New("correct_token"),
+			}
+
 			code := cmd.Run([]string{})
 			Expect(code).To(Equal(1), "Requires container slug")
 		})

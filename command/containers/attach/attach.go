@@ -2,32 +2,38 @@ package attach
 
 import (
 	"crypto/tls"
-	"errors"
+	"flag"
 	"fmt"
-	"io"
-	"net/http"
+	"net/url"
+
 	"os"
+	"strconv"
 	"strings"
 
-	"github.com/gorilla/websocket"
 	"github.com/mitchellh/cli"
 	"github.com/nitrous-io/nitro/command"
 	"github.com/nitrous-io/nitro/command/containers"
 	"github.com/nitrous-io/nitro/pkg/nitrousapi"
+	"github.com/nitrous-io/nitro/pkg/protoshell"
 	"github.com/nitrous-io/nitrous-common/httpclient"
-	"github.com/nitrous-io/nitrous-common/wsconn"
 )
 
-var usage = `
-Usage: nitro attach <container slug>
+var nostdinUsage = "Do not attach STDIN"
+
+var usage = fmt.Sprintf(`
+Usage: nitro attach [OPTIONS] <container slug>
 
   attach to a running container
-`
+
+Options:
+  --no-stdin=false %s.
+`, nostdinUsage)
 
 type Command struct {
-	UI     *cli.BasicUi
-	Client *httpclient.Client
-	Server string
+	UI        *cli.BasicUi
+	Client    *httpclient.Client
+	Server    string
+	TLSConfig *tls.Config
 }
 
 func init() {
@@ -41,12 +47,23 @@ func NewCommand(token string) (cli.Command, error) {
 			Writer:      os.Stdout,
 			ErrorWriter: os.Stderr,
 		},
-		Server: command.Env.APIURL,
-		Client: httpclient.New(token),
+		Server:    command.Env.APIURL,
+		Client:    httpclient.New(token),
+		TLSConfig: nil,
 	}, nil
 }
 
 func (c *Command) Run(args []string) int {
+	var noStdin bool
+	cmdFlags := flag.NewFlagSet("attach", flag.ContinueOnError)
+	cmdFlags.Usage = func() { c.UI.Output(c.Help()) }
+	cmdFlags.BoolVar(&noStdin, "no-stdin", false, nostdinUsage)
+
+	if err := cmdFlags.Parse(args); err != nil {
+		return 1
+	}
+
+	args = cmdFlags.Args()
 	if len(args) != 1 {
 		c.UI.Error(c.Help())
 		return 1
@@ -69,14 +86,26 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	host := fmt.Sprintf("%s:%d", cn.Host.IPAddress, cn.Host.FreighterdPort)
-	tlsConfig, err := command.ClientConfig(cn.Host.Hostname)
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error establishing secure connection to %s", host))
+	host := fmt.Sprintf("%s:%d", cn.Host.ProxyHostname, cn.Host.FreighterdPort)
+	stdin, ok := c.UI.Reader.(*os.File)
+	if !ok {
+		c.UI.Error("Requires a working terminal")
+		return 1
+	}
+	stdout, ok := c.UI.Writer.(*os.File)
+	if !ok {
+		c.UI.Error("Requires a working terminal")
 		return 1
 	}
 
-	if err := c.attach(host, token, cn.CID, tlsConfig, c.UI.Reader, c.UI.Writer); err != nil {
+	// construct params header that includes the wanted command
+	params := url.Values{}
+	params.Set("token", token)
+	params.Set("binary", "true")
+	params.Set("nostdin", strconv.FormatBool(noStdin))
+	endpointURI := fmt.Sprintf("wss://%s/containers/%s/attach?%s", host, cn.CID, params.Encode())
+	sh := protoshell.New(endpointURI, c.TLSConfig)
+	if err := sh.Run(stdin.Fd(), stdout.Fd(), stdin, stdout); err != nil {
 		c.UI.Error(fmt.Sprintf("Exited: %v", err))
 		return 1
 	}
@@ -89,24 +118,4 @@ func (c *Command) Help() string {
 
 func (c *Command) Synopsis() string {
 	return "Attach to a running container"
-}
-
-func (c *Command) attach(host, token, containerID string, tlsConfig *tls.Config, stdin io.Reader, stdout io.Writer) error {
-	headers := http.Header{}
-	headers.Add("Authorization", "Token "+token)
-	wsEndpointURI := fmt.Sprintf("wss://%s/containers/%s/attach/ws", host, containerID)
-	dialer := websocket.Dialer{}
-	if tlsConfig != nil {
-		dialer.TLSClientConfig = tlsConfig
-	}
-	ws, _, err := dialer.Dial(wsEndpointURI, headers)
-	if err != nil {
-		return errors.New("Failed to attach to container.")
-	}
-
-	conn := wsconn.NewConnection(ws)
-	defer conn.Close()
-
-	_, err = io.Copy(stdout, conn)
-	return err
 }

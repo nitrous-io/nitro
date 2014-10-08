@@ -1,8 +1,11 @@
 package run
 
 import (
+	"crypto/tls"
 	"fmt"
+	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/mitchellh/cli"
@@ -32,9 +35,10 @@ func init() {
 }
 
 type Command struct {
-	UI     *cli.BasicUi
-	client *httpclient.Client
-	server string
+	UI        *cli.BasicUi
+	client    *httpclient.Client
+	server    string
+	tlsConfig *tls.Config
 }
 
 func NewCommand(token string) (cli.Command, error) {
@@ -43,8 +47,9 @@ func NewCommand(token string) (cli.Command, error) {
 			Reader: os.Stdin,
 			Writer: os.Stdout,
 		},
-		server: command.Env.APIURL,
-		client: httpclient.New(token),
+		server:    command.Env.APIURL,
+		client:    httpclient.New(token),
+		tlsConfig: nil,
 	}, nil
 }
 
@@ -76,6 +81,12 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	token, err := containers.GetToken(slug, c.server, []string{"shell"}, c.client)
+	if err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
+
 	host := fmt.Sprintf("%s:%d", cr.Host.ProxyHostname, cr.Host.FreighterdPort)
 	command := strings.Join(args[1:], " ")
 
@@ -91,10 +102,15 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	sh := protoshell.New(host, cr.CID, command, nil, func() (string, error) {
-		return containers.GetToken(slug, c.server, []string{"shell"}, c.client)
-	})
-	sh.NoTTY = noTTY
+	// construct params header that includes the wanted command
+	params := url.Values{}
+	params.Set("command", command)
+	params.Set("token", token)
+	params.Set("binary", "true")
+	params.Set("notty", strconv.FormatBool(noTTY))
+	endpointURI := fmt.Sprintf("wss://%s/containers/%s/shell?%s", host, cr.CID, params.Encode())
+
+	sh := protoshell.New(endpointURI, c.tlsConfig)
 	if err := sh.Run(stdin.Fd(), stdout.Fd(), stdin, stdout); err != nil {
 		c.UI.Error(fmt.Sprintf("Exited: %v", err))
 		return 1

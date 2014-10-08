@@ -1,20 +1,26 @@
 package logs
 
 import (
+	"crypto/tls"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
 
+	"github.com/gorilla/websocket"
 	"github.com/mitchellh/cli"
-	"github.com/nitrous-io/freighter/freighterclient"
 	"github.com/nitrous-io/nitro/command"
 	"github.com/nitrous-io/nitro/command/containers"
-	"github.com/nitrous-io/nitro/consts"
 	"github.com/nitrous-io/nitro/pkg/nitrousapi"
+	"github.com/nitrous-io/nitro/pkg/protoshell"
 	"github.com/nitrous-io/nitrous-common/httpclient"
+	"github.com/nitrous-io/nitrous-common/wsconn"
 	flag "github.com/ogier/pflag"
 )
 
@@ -40,6 +46,8 @@ type Command struct {
 	UI     *command.BasicUI
 	Client *httpclient.Client
 	Server string
+
+	TLSConfig *tls.Config
 }
 
 // `logs` command requires user to be logged in first via `nitro login`
@@ -55,8 +63,9 @@ func NewCommand(token string) (cli.Command, error) {
 			Writer:      os.Stdout,
 			ErrorWriter: os.Stderr,
 		}},
-		Server: command.Env.APIURL,
-		Client: httpclient.New(token),
+		Server:    command.Env.APIURL,
+		Client:    httpclient.New(token),
+		TLSConfig: nil,
 	}, nil
 }
 
@@ -95,22 +104,15 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	host := freighterclient.NewHost(
-		cr.Host.IPAddress,
-		int(cr.Host.FreighterdPort),
-		cr.Host.Hostname,
-		[]byte(consts.CACert),
-	)
-	client, err := freighterclient.NewClient(host, "secret not used")
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error connecting to container %s", slug))
-		return 1
-	}
+	host := fmt.Sprintf("%s:%d", cr.Host.ProxyHostname, cr.Host.FreighterdPort)
+	params := &url.Values{}
+	params.Set("follow", strconv.FormatBool(follow))
+	params.Set("timestamps", strconv.FormatBool(timestamps))
+	params.Set("tail", tail)
+	params.Set("token", token)
 
-	err = client.Logs(cr.CID, token, strconv.FormatBool(follow),
-		strconv.FormatBool(timestamps), tail, c.UI.Writer)
-	if err != nil {
-		c.UI.Error(err.Error())
+	if err := c.logs(host, cr.CID, c.TLSConfig, params, c.UI.Reader, c.UI.Writer); err != nil {
+		c.UI.Error(fmt.Sprintf("Exited: %v", err))
 		return 1
 	}
 	return 0
@@ -153,4 +155,25 @@ func (c *Command) getContainerResp(slug string) (*containerResp, error) {
 		return nil, err
 	}
 	return cr, nil
+}
+
+func (c *Command) logs(host, containerID string, tlsConfig *tls.Config, params *url.Values, stdin io.Reader, stdout io.Writer) error {
+	wsEndpointURI := fmt.Sprintf("wss://%s/containers/%s/logs?%s", host, containerID, params.Encode())
+	dialer := websocket.Dialer{}
+	if tlsConfig != nil {
+		dialer.TLSClientConfig = tlsConfig
+	}
+	ws, _, err := dialer.Dial(wsEndpointURI, http.Header{})
+	if err != nil {
+		return errors.New("Failed to fetch logs from container.")
+	}
+
+	conn := wsconn.NewConnection(ws)
+	defer conn.Close()
+
+	in := protoshell.NewShellReader(conn, websocket.TextMessage)
+	if _, err = io.Copy(stdout, in); err != nil {
+		return err
+	}
+	return nil
 }

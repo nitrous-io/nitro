@@ -14,4 +14,4 @@ docker run \
   -e APT_GPG_PUBLIC=/get.nitrous.io/.gpg/nitrous.pub.gpg \
   -e APT_GPG_SECRET=/get.nitrous.io/.gpg/nitrous.sec.gpg \
   -e APT_GPG_PASSPHRASE=/get.nitrous.io/.gpg/nitrous.passphrase.gpg \
-  nitrousio/packager /bin/bash -c "./script/linux-release $APP $VERSION $ENV && ./script/osx-release $APP $VERSION $ENV"
+  nitrousio/packager /bin/bash -c "./script/linux-release $APP $VERSION $ENV && ./script/osx-release $APP $VERSION $ENV && ./script/win-release $APP $VERSION $ENV"

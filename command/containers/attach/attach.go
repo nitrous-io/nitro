@@ -76,17 +76,17 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	cn, err := nitrousapi.GetContainer(c.Client, c.Server, slug)
+	cr, err := nitrousapi.GetContainer(c.Client, c.Server, slug)
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1
 	}
-	if cn.State != "running" {
+	if cr.State != "running" {
 		c.UI.Error("Requires a running container")
 		return 1
 	}
 
-	host := fmt.Sprintf("%s:%d", cn.Host.ProxyHostname, cn.Host.FreighterdPort)
+	host := fmt.Sprintf("%s:443", cr.Host.ProxyHostname)
 	stdin, ok := c.UI.Reader.(*os.File)
 	if !ok {
 		c.UI.Error("Requires a working terminal")
@@ -103,7 +103,9 @@ func (c *Command) Run(args []string) int {
 	params.Set("token", token)
 	params.Set("binary", "true")
 	params.Set("nostdin", strconv.FormatBool(noStdin))
-	endpointURI := fmt.Sprintf("wss://%s/containers/%s/attach?%s", host, cn.CID, params.Encode())
+	params.Set("freighterd_port", strconv.Itoa(int(cr.Host.FreighterdPort)))
+
+	endpointURI := fmt.Sprintf("wss://%s/containers/%s/attach?%s", host, cr.CID, params.Encode())
 	sh := protoshell.New(endpointURI, c.TLSConfig)
 	if err := sh.Run(stdin.Fd(), stdout.Fd(), stdin, stdout); err != nil {
 		c.UI.Error(fmt.Sprintf("Exited: %v", err))

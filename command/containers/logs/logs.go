@@ -104,12 +104,13 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	host := fmt.Sprintf("%s:%d", cr.Host.ProxyHostname, cr.Host.FreighterdPort)
+	host := fmt.Sprintf("%s:443", cr.Host.ProxyHostname)
 	params := &url.Values{}
 	params.Set("follow", strconv.FormatBool(follow))
 	params.Set("timestamps", strconv.FormatBool(timestamps))
 	params.Set("tail", tail)
 	params.Set("token", token)
+	params.Set("freighterd_port", strconv.Itoa(int(cr.Host.FreighterdPort)))
 
 	if err := c.logs(host, cr.CID, c.TLSConfig, params, c.UI.Reader, c.UI.Writer); err != nil {
 		c.UI.Error(fmt.Sprintf("Exited: %v", err))

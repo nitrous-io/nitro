@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/mitchellh/cli"
@@ -103,7 +104,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	host := fmt.Sprintf("%s:%d", cr.Host.ProxyHostname, cr.Host.FreighterdPort)
+	host := fmt.Sprintf("%s:443", cr.Host.ProxyHostname)
 	command := getLoginCommand(username)
 
 	// construct params header that includes the wanted command
@@ -111,6 +112,7 @@ func (c *Command) Run(args []string) int {
 	params.Set("command", command)
 	params.Set("token", token)
 	params.Set("binary", "true")
+	params.Set("freighterd_port", strconv.Itoa(int(cr.Host.FreighterdPort)))
 	endpointURI := fmt.Sprintf("wss://%s/containers/%s/shell?%s", host, cr.CID, params.Encode())
 
 	sh := protoshell.New(endpointURI, c.tlsConfig)

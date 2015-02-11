@@ -106,11 +106,16 @@ var _ = Describe("containers/attach", func() {
 				},
 			}),
 		))
+
+		// switch command freighterd port to the custom port for duration of
+		// the request
+		command.FreighterdPort = int(fport)
 	})
 
 	AfterEach(func() {
 		nsrv.Close()
 		fsrv.Close()
+		command.FreighterdPort = 65333
 	})
 
 	It("requires container slug", func() {

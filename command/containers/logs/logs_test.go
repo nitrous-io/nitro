@@ -146,6 +146,14 @@ var _ = Describe("logs", func() {
 
 			fStatusCode = http.StatusOK
 			fResponseBody = "hello im a log"
+
+			// switch command freighterd port to the custom port for duration of
+			// the request
+			command.FreighterdPort = int(portInt)
+		})
+
+		AfterEach(func() {
+			command.FreighterdPort = 65333
 		})
 
 		It("get logs of the container", func(done Done) {

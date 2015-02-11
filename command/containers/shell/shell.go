@@ -21,6 +21,9 @@ const (
 	defaultTerm   = "xterm-256color"
 )
 
+// from `man 8 useradd`
+var usernameRegex = regexp.MustCompile(`\A[a-z_][a-z0-9_-]*[$]?\z`)
+
 var usage = fmt.Sprintf(`
 Usage: nitro shell <slug>
 
@@ -63,6 +66,12 @@ func (c *Command) Run(args []string) int {
 	cmdFlags.Usage = func() { c.UI.Output(c.Help()) }
 	cmdFlags.StringVarP(&username, "username", "u", "", usernameUsage)
 
+	loginCmd, err := getLoginCommand(username, os.Getenv("TERM"))
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("Invalid username: %s", username))
+		return 1
+	}
+
 	if err := cmdFlags.Parse(args); err != nil {
 		return 1
 	}
@@ -103,12 +112,13 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	host := fmt.Sprintf("%s:%d", cr.Host.ProxyHostname, cr.Host.FreighterdPort)
-	command := getLoginCommand(username)
+	// always use the proxy port which is 65333 as freighterdPort in local
+	// maybe different
+	host := fmt.Sprintf("%s:%d", cr.Host.ProxyHostname, command.FreighterdPort)
 
 	// construct params header that includes the wanted command
 	params := url.Values{}
-	params.Set("command", command)
+	params.Set("command", loginCmd)
 	params.Set("token", token)
 	params.Set("binary", "true")
 	endpointURI := fmt.Sprintf("wss://%s/containers/%s/shell?%s", host, cr.CID, params.Encode())
@@ -129,16 +139,19 @@ func (c *Command) Synopsis() string {
 	return "Open a shell on a container"
 }
 
-func getLoginCommand(username string) string {
+func getLoginCommand(username, term string) (string, error) {
 	if username == "" {
 		username = "root"
 	}
-	term := os.Getenv("TERM")
 	if term == "" {
 		term = defaultTerm
 	}
 
+	if !usernameRegex.MatchString(username) || len(username) > 32 {
+		return "", fmt.Errorf("invalid username")
+	}
+
 	// use script (with dev/null so it doesn't actually log input to tty), because getty messes up ownership and permissions of /dev/tty
 	loginCmd := fmt.Sprintf("/bin/login -f %s -p TERM=%s", username, term)
-	return fmt.Sprintf("script -q -c '%s' /dev/null || %s", loginCmd, loginCmd)
+	return fmt.Sprintf("script -q -c '%s' /dev/null || %s", loginCmd, loginCmd), nil
 }

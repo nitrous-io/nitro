@@ -13,6 +13,9 @@ var (
 	Env      *Environment
 
 	ErrMissingAuthToken = errors.New("Missing Auth Token")
+
+	// default freighterd port
+	FreighterdPort = 65333
 )
 
 func init() {

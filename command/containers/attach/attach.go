@@ -86,7 +86,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	host := fmt.Sprintf("%s:%d", cn.Host.ProxyHostname, cn.Host.FreighterdPort)
+	host := fmt.Sprintf("%s:%d", cn.Host.ProxyHostname, command.FreighterdPort)
 	stdin, ok := c.UI.Reader.(*os.File)
 	if !ok {
 		c.UI.Error("Requires a working terminal")

@@ -105,11 +105,24 @@ var _ = Describe("Command", func() {
 				term := tc[1]
 				command := tc[2]
 
-				origTerm := os.Getenv("TERM")
-				os.Setenv("TERM", term)
-				cmd := getLoginCommand(user)
-				os.Setenv("TERM", origTerm)
+				cmd, err := getLoginCommand(user, term)
+				Expect(err).To(BeNil())
 				Expect(cmd).To(Equal(command), "Incorrect login command")
+			}
+		})
+
+		It("disallows invalid usernames", func() {
+			testCases := []string{
+				"$(touch /tmp/ohnoes)root",
+				"`touch /tmp/ohnoes`action",
+				`Administrator`,
+				`mismatched double quotes"`,
+				strings.Repeat("a", 33),
+			}
+
+			for _, tc := range testCases {
+				_, err := getLoginCommand(tc, "")
+				Expect(err).To(MatchError("invalid username"))
 			}
 		})
 	})
@@ -153,12 +166,17 @@ func (s *nitrousServer) getHost(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"host": resp,
 	})
+
+	// switch command freighterd port to the custom port for duration of
+	// the request
+	command.FreighterdPort = int(portInt)
 }
 
 func (s *nitrousServer) Close() {
 	s.ts.Close()
 	s.srv.CloseClientConnections()
 	s.srv.Close()
+	command.FreighterdPort = 65333
 }
 
 func newNitrousServer(containerID, containerToken, shellID string, hostID int64) *nitrousServer {

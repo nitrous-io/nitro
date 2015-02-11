@@ -59,7 +59,11 @@ import (
 	_ "github.com/nitrous-io/nitro/command/volumes/remove"
 )
 
-var version string
+var (
+	version          string // current nitro version
+	freighterVersion string // current freighter version that works with current nitro
+	nitrousVersion   string // current nitrous version that works with current nitro
+)
 
 func main() {
 	s := os.Getenv("NO_SSL_VERIFY")
